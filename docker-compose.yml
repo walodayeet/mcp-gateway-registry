@@ -28,6 +28,7 @@ services:
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
       - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
+      - DOCUMENTDB_USE_TLS=false
     volumes:
       - ./scripts/init-mongodb-ce.py:/app/scripts/init-mongodb-ce.py:ro
       - ./scripts/registry-admins.json:/app/scripts/registry-admins.json:ro
@@ -52,6 +53,7 @@ services:
       - DOCUMENTDB_PORT=27017
       - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
       - DOCUMENTDB_REPLICA_SET=rs0
+      - DOCUMENTDB_USE_TLS=false
     ports:
       - "8087:8080"
       - "8443:8443"
@@ -79,6 +81,7 @@ services:
       - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
+      - DOCUMENTDB_USE_TLS=false
     ports:
       - "8888:8888"
     volumes:
