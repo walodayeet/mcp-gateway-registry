@@ -117,7 +117,7 @@ services:
       KC_HTTP_PORT: 8080
       KC_PROXY: edge
     ports:
-      - "8080:8080"
+      - "8086:8080"
     depends_on:
       keycloak-db:
         condition: service_healthy
