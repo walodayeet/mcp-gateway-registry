@@ -8,8 +8,8 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongodb-data:/data/db
-      - mongodb-config:/data/configdb
+      - mongodb-data-v2:/data/db
+      - mongodb-config-v2:/data/configdb
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 60s
@@ -29,10 +29,8 @@ services:
       - DOCUMENTDB_PORT=27017
       - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
     volumes:
-      # Using relative bind mounts for init scripts (Dokploy handles these fine usually)
       - ./scripts/init-mongodb-ce.py:/app/scripts/init-mongodb-ce.py:ro
       - ./scripts/registry-admins.json:/app/scripts/registry-admins.json:ro
-      - ./scripts/mcp-registry-admin.json:/app/scripts/mcp-registry-admin.json:ro
     command: >
       sh -c "
       pip install --quiet motor pymongo &&
@@ -49,7 +47,7 @@ services:
       - REGISTRY_MODE=${REGISTRY_MODE:-full}
       - SECRET_KEY=${SECRET_KEY}
       - AUTH_SERVER_URL=${AUTH_SERVER_URL}
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-mongodb-ce}
+      - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
       - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
@@ -59,11 +57,10 @@ services:
       - "443:8443"
       - "7860:7860"
     volumes:
-      - mcp-servers:/app/registry/servers
-      - mcp-agents:/app/registry/agents
-      - mcp-models:/app/registry/models
-      # IMPORTANT: Removed all single-file volume mounts (scopes.yml, federation.json)
-      - registry-logs:/app/logs
+      - registry-servers-v2:/app/registry/servers
+      - registry-agents-v2:/app/registry/agents
+      - registry-models-v2:/app/registry/models
+      - registry-logs-v2:/app/logs
     depends_on:
       auth-server:
         condition: service_started
@@ -79,13 +76,13 @@ services:
       - REGISTRY_URL=${REGISTRY_URL}
       - SECRET_KEY=${SECRET_KEY}
       - AUTH_PROVIDER=${AUTH_PROVIDER:-keycloak}
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-mongodb-ce}
+      - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
     ports:
       - "8888:8888"
     volumes:
-      - auth-logs:/app/logs
+      - auth-logs-v2:/app/logs
     depends_on:
       mongodb-init:
         condition: service_completed_successfully
@@ -98,7 +95,7 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
     volumes:
-      - keycloak_db_data:/var/lib/postgresql/data
+      - keycloak-db-data-v2:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak"]
@@ -127,11 +124,11 @@ services:
     restart: unless-stopped
 
 volumes:
-  mongodb-data:
-  mongodb-config:
-  keycloak_db_data:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  registry-logs:
-  auth-logs:
+  mongodb-data-v2:
+  mongodb-config-v2:
+  keycloak-db-data-v2:
+  registry-servers-v2:
+  registry-agents-v2:
+  registry-models-v2:
+  registry-logs-v2:
+  auth-logs-v2:
