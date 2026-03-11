@@ -17,6 +17,7 @@ PYEOF
 fi
 
 cd /app && source /app/.venv/bin/activate
-# Ensure the server listens on all interfaces to be reachable from other containers
+# Force bind to 0.0.0.0 so the Registry container can reach it
 export AUTH_SERVER_HOST=0.0.0.0
+echo "Starting Auth Server on ${AUTH_SERVER_HOST}:8888..."
 python3 server.py

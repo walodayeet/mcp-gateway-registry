@@ -7,7 +7,8 @@ if [ -n "$DOCUMENTDB_HOST" ]; then
     source /app/.venv/bin/activate
     python3 <<'PYEOF'
 import pymongo, os, time
-uri = f'mongodb://{os.getenv("DOCUMENTDB_HOST", "mongodb")}:27017/'
+host = os.getenv('DOCUMENTDB_HOST', 'mongodb')
+uri = f'mongodb://{host}:27017/'
 while True:
     try:
         pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000).admin.command('ping')
@@ -15,28 +16,53 @@ while True:
         break
     except: 
         print('Waiting for MongoDB...')
-        time.sleep(5)
+        time.sleep(2)
 PYEOF
     deactivate
 fi
 
-# --- Nginx Non-Root Hardening ---
+# --- Global Nginx Non-Root Permissions Fix ---
 mkdir -p /tmp/nginx/body /tmp/nginx/proxy /tmp/nginx/run /tmp/nginx/log /etc/nginx/conf.d
-# Create a wrapper for nginx to force writable paths even when called by Python
-mkdir -p /app/bin
-cat << 'WRAPPER' > /app/bin/nginx
-#!/bin/bash
-/usr/sbin/nginx -g "pid /tmp/nginx/run/nginx.pid; error_log /tmp/nginx/log/error.log;" "$@"
-WRAPPER
-chmod +x /app/bin/nginx
-export PATH="/app/bin:$PATH"
 
-# Remove 'user' directive from global config
-sed -i 's/^user /#user /g' /etc/nginx/nginx.conf 2>/dev/null || true
+# Overwrite the system-wide nginx.conf to use /tmp for everything (PID, Temp folders)
+cat << 'NGINX_GLOBAL' > /etc/nginx/nginx.conf
+worker_processes auto;
+pid /tmp/nginx/run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
+
+events {
+    worker_connections 768;
+}
+
+http {
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    access_log /tmp/nginx/log/access.log;
+    error_log /tmp/nginx/log/error.log;
+
+    client_body_temp_path /tmp/nginx/body;
+    proxy_temp_path /tmp/nginx/proxy;
+    fastcgi_temp_path /tmp/nginx/fastcgi;
+    uwsgi_temp_path /tmp/nginx/uwsgi;
+    scgi_temp_path /tmp/nginx/scgi;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+NGINX_GLOBAL
+
+# Remove old configs
+rm -f /etc/nginx/conf.d/nginx_rev_proxy.conf
+rm -f /etc/nginx/sites-enabled/default
 
 # --- Start Registry App ---
 cd /app && source /app/.venv/bin/activate
-echo "Starting Registry app..."
+echo "Launching Registry app..."
 uvicorn registry.main:app --host 0.0.0.0 --port 7860 --proxy-headers --forwarded-allow-ips='*' &
 
 # --- Wait for Valid Config ---
@@ -51,6 +77,6 @@ for i in {1..60}; do
     sleep 2
 done
 
-# Start Nginx using our wrapper
-echo "Starting Nginx..."
+# Start Nginx
+echo "Starting Nginx (Non-Root, Global Override)..."
 nginx -g "daemon off;"
