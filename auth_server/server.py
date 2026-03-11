@@ -287,7 +287,7 @@ def mask_headers(headers: dict) -> dict:
     return masked
 
 
-async def map_groups_to_scopes(groups: list[str]) -> list[str]:
+async def map_groups_to_scopes(groups: list[str]) -> list[str]:    """Map identity provider groups to MCP scopes."""    scopes = []    try:        scope_repo = get_scope_repository()        for group in groups:            group_scopes = await scope_repo.get_group_mappings(group)            if group_scopes:                scopes.extend(group_scopes)    except Exception as e:        logger.error(f"Group mapping error: {e}", exc_info=True)        group_mappings = SCOPES_CONFIG.get('group_mappings', {})        for group in groups:            if group in group_mappings:                scopes.extend(group_mappings[group])    seen = set()    return [x for x in scopes if not (x in seen or seen.add(x))]async def validate_session_cookie(cookie_value: str) -> dict[str, any]:
     """Map identity provider groups to MCP scopes."""
     scopes = []
     try:
@@ -298,17 +298,12 @@ async def map_groups_to_scopes(groups: list[str]) -> list[str]:
                 scopes.extend(group_scopes)
     except Exception as e:
         logger.error(f"Group mapping error: {e}", exc_info=True)
-        group_mappings = SCOPES_CONFIG.get('group_mappings', {})
+        group_mappings = SCOPES_CONFIG.get("group_mappings", {})
         for group in groups:
             if group in group_mappings:
                 scopes.extend(group_mappings[group])
     seen = set()
-    unique_scopes = []
-    for scope in scopes:
-        if scope not in seen:
-            seen.add(scope)
-            unique_scopes.append(scope)
-    return unique_scopes
+    return [x for x in scopes if not (x in seen or seen.add(x))]
 def parse_server_and_tool_from_url(original_url: str) -> tuple[str | None, str | None]:
     """
     Parse server name and tool name from the original URL and request payload.
@@ -668,19 +663,101 @@ class SimplifiedCognitoValidator:
             self._cognito_clients[region] = boto3.client("cognito-idp", region_name=region)
         return self._cognito_clients[region]
 
-    def _get_jwks(self, user_pool_id: str, region: str) -> dict:
-        cache_key = f'{region}:{user_pool_id}'
-        if cache_key not in self._jwks_cache:
-            try:
-                issuer = f'https://cognito-idp.{region}.amazonaws.com/{user_pool_id}'
-                jwks_url = f'{issuer}/.well-known/jwks.json'
-                response = requests.get(jwks_url, timeout=10)
-                response.raise_for_status()
-                self._jwks_cache[cache_key] = response.json()
-            except Exception as e:
-                logger.error(f'JWKS retrieval failed: {e}', exc_info=True)
-                raise ValueError(f'Cannot retrieve JWKS: {e}')
-        return self._jwks_cache[cache_key]
+    def _get_jwks(self, user_pool_id: str, region: str) -> dict:        cache_key = f'{region}:{user_pool_id}'        if cache_key not in self._jwks_cache:            try:                issuer = f'https://cognito-idp.{region}.amazonaws.com/{user_pool_id}'                jwks_url = f'{issuer}/.well-known/jwks.json'                response = requests.get(jwks_url, timeout=10)                response.raise_for_status()                self._jwks_cache[cache_key] = response.json()            except Exception as e:                logger.error(f'JWKS retrieval failed: {e}', exc_info=True)                raise ValueError(f'Cannot retrieve JWKS: {e}')        return self._jwks_cache[cache_key]    def validate_jwt_token(        self, access_token: str, user_pool_id: str, client_id: str, region: str = None    ) -> dict:
+        """
+        Validate JWT access token
+
+        Args:
+            access_token: The bearer token to validate
+            user_pool_id: Cognito User Pool ID
+            client_id: Expected client ID
+            region: AWS region (uses default if not provided)
+
+        Returns:
+            Dict containing token claims if valid
+
+        Raises:
+            ValueError: If token is invalid
+        """
+        if not region:
+            region = self.default_region
+
+        try:
+            # Decode header to get key ID
+            unverified_header = jwt.get_unverified_header(access_token)
+            kid = unverified_header.get("kid")
+
+            if not kid:
+                raise ValueError("Token missing 'kid' in header")
+
+            # Get JWKS and find matching key
+            jwks = self._get_jwks(user_pool_id, region)
+            signing_key = None
+
+            for key in jwks.get("keys", []):
+                if key.get("kid") == kid:
+                    # Handle different versions of PyJWT
+                    try:
+                        # For newer versions of PyJWT
+                        from jwt.algorithms import RSAAlgorithm
+
+                        signing_key = RSAAlgorithm.from_jwk(key)
+                    except (ImportError, AttributeError):
+                        try:
+                            # For older versions of PyJWT
+                            from jwt.algorithms import get_default_algorithms
+
+                            algorithms = get_default_algorithms()
+                            signing_key = algorithms["RS256"].from_jwk(key)
+                        except (ImportError, AttributeError):
+                            # For PyJWT 2.0.0+
+                            signing_key = PyJWK.from_jwk(json.dumps(key)).key
+                    break
+
+            if not signing_key:
+                raise ValueError(f"No matching key found for kid: {kid}")
+
+            # Set up issuer for validation
+            issuer = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
+
+            # Validate and decode token
+            claims = jwt.decode(
+                access_token,
+                signing_key,
+                algorithms=["RS256"],
+                issuer=issuer,
+                options={
+                    "verify_aud": False,  # M2M tokens might not have audience
+                    "verify_exp": True,  # Always check expiration
+                    "verify_iat": True,  # Check issued at time
+                },
+            )
+
+            # Additional validations
+            token_use = claims.get("token_use")
+            if token_use not in ["access", "id"]:  # Allow both access and id tokens
+                raise ValueError(f"Invalid token_use: {token_use}")
+
+            # For M2M tokens, check client_id
+            token_client_id = claims.get("client_id")
+            if token_client_id and token_client_id != client_id:
+                logger.warning("Token issued for different client than expected")
+                # Don't fail immediately - could be user token with different structure
+
+            logger.info("Successfully validated JWT token for client/user")
+            return claims
+
+        except jwt.ExpiredSignatureError:
+            error_msg = "Token has expired"
+            logger.warning(error_msg)
+            raise ValueError(error_msg)
+        except jwt.InvalidTokenError as e:
+            error_msg = f"Invalid token: {e}"
+            logger.warning(error_msg)
+            raise ValueError(error_msg)
+        except Exception as e:
+            logger.error(f"Auth Exception: {e}", exc_info=True)
+            raise ValueError(f"Operation failed: {e}")
     def validate_with_boto3(self, access_token: str, region: str = None) -> dict:
         """
         Validate token using boto3 GetUser API (works for user tokens)
