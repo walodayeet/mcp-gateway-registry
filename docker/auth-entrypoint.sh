@@ -18,13 +18,18 @@ PYEOF
 fi
 
 cd /app && source /app/.venv/bin/activate
-# Dynamically find server.py to avoid path errors
-SERVER_PATH=$(find /app -name "server.py" | head -n 1)
-if [ -n "$SERVER_PATH" ]; then
-    echo "Starting Auth Server: $SERVER_PATH"
-    python3 "$SERVER_PATH"
+# server.py is in /app/ root because Dockerfile.auth copies auth_server/ content to /app/
+if [ -f "/app/server.py" ]; then
+    echo "Starting Auth Server at /app/server.py"
+    python3 /app/server.py
 else
-    echo "FATAL: Could not find server.py in /app"
-    ls -R /app
-    exit 1
+    echo "Searching for server.py fallback..."
+    FALLBACK=$(find /app -name "server.py" | head -n 1)
+    if [ -n "$FALLBACK" ]; then
+        python3 "$FALLBACK"
+    else
+        echo "FATAL: server.py not found!"
+        ls -R /app
+        exit 1
+    fi
 fi
