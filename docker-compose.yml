@@ -43,6 +43,7 @@ services:
       - REGISTRY_MODE=full
       - SECRET_KEY=${SECRET_KEY}
       - AUTH_SERVER_URL=http://auth-server:8888
+      - AUTH_SERVER_EXTERNAL_URL=${AUTH_SERVER_EXTERNAL_URL}
       - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
@@ -95,6 +96,22 @@ services:
     depends_on:
       mongodb-init:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  mcpgw-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mcp-server
+      args:
+        SERVER_DIR: servers/mcpgw
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8003
+      - REGISTRY_BASE_URL=http://registry:8080
+    ports:
+      - "8003:8003"
+    depends_on:
+      - registry
     restart: unless-stopped
 
   keycloak-db:
