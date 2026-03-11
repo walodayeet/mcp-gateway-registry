@@ -287,52 +287,7 @@ def mask_headers(headers: dict) -> dict:
     return masked
 
 
-async def map_groups_to_scopes(groups: list[str]) -> list[str]:
-    """
-    Map identity provider groups to MCP scopes by querying DocumentDB directly.
-
-    Args:
-        groups: List of group names from identity provider (Cognito, Keycloak, etc.)
-
-    Returns:
-        List of MCP scopes
-    """
-    scopes = []
-
-    # Query DocumentDB directly for group mappings
-    try:
-        scope_repo = get_scope_repository()
-
-        for group in groups:
-            # Query DocumentDB for this group's scope mappings
-            group_scopes = await scope_repo.get_group_mappings(group)
-            if group_scopes:
-                scopes.extend(group_scopes)
-                logger.debug(f"Mapped group '{group}' to scopes: {group_scopes}")
-            else:
-                logger.debug(f"No scope mapping found for group: {group}")
-    except Exception as e:
-        # Fall back to in-memory config if DocumentDB query fails
-        group_mappings = SCOPES_CONFIG.get("group_mappings", {})
-        for group in groups:
-            if group in group_mappings:
-                group_scopes = group_mappings[group]
-                scopes.extend(group_scopes)
-                logger.debug(f"Mapped group '{group}' to scopes (fallback): {group_scopes}")
-
-    # Remove duplicates while preserving order
-    seen = set()
-    unique_scopes = []
-    for scope in scopes:
-        if scope not in seen:
-            seen.add(scope)
-            unique_scopes.append(scope)
-
-    logger.info(f"Final mapped scopes: {unique_scopes}")
-    return unique_scopes
-
-
-async def validate_session_cookie(cookie_value: str) -> dict[str, any]:
+async def map_groups_to_scopes(groups: list[str]) -> list[str]:    """Map identity provider groups to MCP scopes."""    scopes = []    try:        scope_repo = get_scope_repository()        for group in groups:            group_scopes = await scope_repo.get_group_mappings(group)            if group_scopes:                scopes.extend(group_scopes)    except Exception as e:        logger.error(f"Group mapping error: {e}", exc_info=True)        group_mappings = SCOPES_CONFIG.get('group_mappings', {})        for group in groups:            if group in group_mappings:                scopes.extend(group_mappings[group])    seen = set()    return [x for x in scopes if not (x in seen or seen.add(x))]async def validate_session_cookie(cookie_value: str) -> dict[str, any]:
     """
     Validate session cookie using itsdangerous serializer.
 
@@ -751,34 +706,7 @@ class SimplifiedCognitoValidator:
             self._cognito_clients[region] = boto3.client("cognito-idp", region_name=region)
         return self._cognito_clients[region]
 
-    def _get_jwks(self, user_pool_id: str, region: str) -> dict:
-        """
-        Get JSON Web Key Set (JWKS) from Cognito with caching
-        """
-        cache_key = f"{region}:{user_pool_id}"
-
-        if cache_key not in self._jwks_cache:
-            try:
-                issuer = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
-                jwks_url = f"{issuer}/.well-known/jwks.json"
-
-                response = requests.get(jwks_url, timeout=10)
-                response.raise_for_status()
-                jwks = response.json()
-
-                self._jwks_cache[cache_key] = jwks
-                logger.debug(
-                    f"Retrieved JWKS for {cache_key} with {len(jwks.get('keys', []))} keys"
-                )
-
-        except Exception as e:
-            logger.error(f"Auth Exception: {e}", exc_info=True)
-            raise ValueError(f"Operation failed: {e}")
-        return self._jwks_cache[cache_key]
-
-    def validate_jwt_token(
-        self, access_token: str, user_pool_id: str, client_id: str, region: str = None
-    ) -> dict:
+    def _get_jwks(self, user_pool_id: str, region: str) -> dict:        cache_key = f'{region}:{user_pool_id}'        if cache_key not in self._jwks_cache:            try:                issuer = f'https://cognito-idp.{region}.amazonaws.com/{user_pool_id}'                jwks_url = f'{issuer}/.well-known/jwks.json'                response = requests.get(jwks_url, timeout=10)                response.raise_for_status()                self._jwks_cache[cache_key] = response.json()            except Exception as e:                logger.error(f'JWKS retrieval failed: {e}', exc_info=True)                raise ValueError(f'Cannot retrieve JWKS: {e}')        return self._jwks_cache[cache_key]    def validate_jwt_token(        self, access_token: str, user_pool_id: str, client_id: str, region: str = None    ) -> dict:
         """
         Validate JWT access token
 
