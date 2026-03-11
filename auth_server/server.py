@@ -1868,7 +1868,7 @@ async def get_oauth2_providers():
         auth_provider_env = os.getenv("AUTH_PROVIDER")
         logger.info(f"Debug: AUTH_PROVIDER environment variable = '{auth_provider_env}'")
 
-        providers = get_enabled_providers(); logger.info(f"DISCOVERED_PROVIDERS: {providers}")
+        providers = get_enabled_providers(); logger.info(f"DISCOVERED_PROVIDERS: {providers}"); logger.info(f"DISCOVERED_PROVIDERS: {providers}")
         return {"providers": providers}
         except Exception as e:
             logger.error(f"Auth Exception: {e}", exc_info=True)
