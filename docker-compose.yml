@@ -1,19 +1,6 @@
 version: '3.8'
 
-# DocumentDB Initialization:
-# For AWS DocumentDB Elastic Cluster setup, run the initialization script:
-#   export DOCUMENTDB_HOST=your-cluster.docdb.amazonaws.com
-#   export DOCUMENTDB_USERNAME=admin
-#   export DOCUMENTDB_PASSWORD=yourpassword
-#   ./scripts/init-documentdb.sh
-#
-# Then set STORAGE_BACKEND=documentdb in your environment and restart services.
-# Note: DocumentDB is a managed AWS service and runs outside of Docker.
-
 services:
-  # MongoDB Community Edition 8.2 (alternative to DocumentDB for local development)
-  # Vector search is implemented in application code (see search_repository.py)
-  # Running without authentication for local development simplicity
   mongodb:
     image: mongo:8.2
     container_name: mcp-mongodb
@@ -21,15 +8,6 @@ services:
     ports:
       - "27017:27017"
     volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
       - mongodb-data:/data/db
       - mongodb-config:/data/configdb
     healthcheck:
@@ -40,7 +18,6 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # MongoDB initialization (creates replica set, indexes, and loads admin scope)
   mongodb-init:
     image: python:3.11-slim
     container_name: mcp-mongodb-init
@@ -51,25 +28,10 @@ services:
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
       - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
-      - DOCUMENTDB_USERNAME=${DOCUMENTDB_USERNAME:-}
-      - DOCUMENTDB_PASSWORD=${DOCUMENTDB_PASSWORD:-}
-      - DOCUMENTDB_NAMESPACE=${DOCUMENTDB_NAMESPACE:-default}
-      - ENTRA_GROUP_ADMIN_ID=${ENTRA_GROUP_ADMIN_ID:-}
     volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
       - ./scripts/init-mongodb-ce.py:/app/scripts/init-mongodb-ce.py:ro
       - ./scripts/registry-admins.json:/app/scripts/registry-admins.json:ro
       - ./scripts/mcp-registry-admin.json:/app/scripts/mcp-registry-admin.json:ro
-      - ./scripts/mcp-servers-unrestricted-read.json:/app/scripts/mcp-servers-unrestricted-read.json:ro
-      - ./scripts/mcp-servers-unrestricted-execute.json:/app/scripts/mcp-servers-unrestricted-execute.json:ro
     command: >
       sh -c "
       pip install --quiet motor pymongo &&
@@ -77,187 +39,37 @@ services:
       "
     restart: "no"
 
-  # Registry service (includes nginx, SSL, FAISS, models)
   registry:
     build:
       context: .
       dockerfile: docker/Dockerfile.registry
-      args:
-        BUILD_VERSION: ${BUILD_VERSION:-1.0.0}
     environment:
-      # Deployment Mode Configuration
       - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-with-gateway}
       - REGISTRY_MODE=${REGISTRY_MODE:-full}
-      - GATEWAY_ADDITIONAL_SERVER_NAMES=${GATEWAY_ADDITIONAL_SERVER_NAMES:-}
       - SECRET_KEY=${SECRET_KEY}
       - AUTH_SERVER_URL=${AUTH_SERVER_URL}
-      - AUTH_SERVER_EXTERNAL_URL=${AUTH_SERVER_EXTERNAL_URL}
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - GITHUB_ENABLED=${GITHUB_ENABLED:-false}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_ENABLED=${GOOGLE_ENABLED:-false}
-      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
-      - COGNITO_CLIENT_SECRET=${COGNITO_CLIENT_SECRET}
-      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
-      - COGNITO_ENABLED=${COGNITO_ENABLED:-false}
-      - AWS_REGION=${AWS_REGION:-us-east-1}
-      - HEALTH_CHECK_INTERVAL_SECONDS=${HEALTH_CHECK_INTERVAL_SECONDS:-30}
-      - SRE_GATEWAY_AUTH_TOKEN=${SRE_GATEWAY_AUTH_TOKEN}
-      - ATLASSIAN_AUTH_TOKEN=${ATLASSIAN_AUTH_TOKEN}
-      # Metrics configuration
-      - METRICS_SERVICE_URL=http://metrics-service:8890
-      - METRICS_API_KEY=${METRICS_API_KEY_REGISTRY}
-      - METRICS_API_KEY_NGINX=${METRICS_API_KEY_REGISTRY}
-      # Keycloak configuration
-      - AUTH_PROVIDER=${AUTH_PROVIDER:-cognito}
-      - KEYCLOAK_ENABLED=${KEYCLOAK_ENABLED:-false}
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-mcp-gateway}
-      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-mcp-gateway-web}
-      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
-      - KEYCLOAK_M2M_CLIENT_ID=${KEYCLOAK_M2M_CLIENT_ID}
-      - KEYCLOAK_M2M_CLIENT_SECRET=${KEYCLOAK_M2M_CLIENT_SECRET}
-      # Entra ID configuration
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID}
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
-      - ENTRA_ENABLED=${ENTRA_ENABLED:-false}
-      # External Registry Configuration
-      - EXTERNAL_REGISTRY_TAGS=${EXTERNAL_REGISTRY_TAGS:-anthropic-registry,workday-asor}
-      - ASOR_ACCESS_TOKEN=${ASOR_ACCESS_TOKEN}
-      - ASOR_CLIENT_CREDENTIALS=${ASOR_CLIENT_CREDENTIALS}
-      # Security Scanning Configuration
-      - SECURITY_SCAN_ENABLED=${SECURITY_SCAN_ENABLED:-true}
-      - SECURITY_SCAN_ON_REGISTRATION=${SECURITY_SCAN_ON_REGISTRATION:-true}
-      - SECURITY_BLOCK_UNSAFE_SERVERS=${SECURITY_BLOCK_UNSAFE_SERVERS:-true}
-      - SECURITY_ANALYZERS=${SECURITY_ANALYZERS:-yara}
-      - SECURITY_SCAN_TIMEOUT=${SECURITY_SCAN_TIMEOUT:-60}
-      - SECURITY_ADD_PENDING_TAG=${SECURITY_ADD_PENDING_TAG:-true}
-      - MCP_SCANNER_LLM_API_KEY=${MCP_SCANNER_LLM_API_KEY}
-      # Storage Backend Configuration
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-file}
-      # DocumentDB/MongoDB Configuration (when STORAGE_BACKEND=documentdb)
-      - DOCUMENTDB_HOST=${DOCUMENTDB_HOST:-mongodb}
-      - DOCUMENTDB_PORT=${DOCUMENTDB_PORT:-27017}
-      - DOCUMENTDB_USERNAME=${DOCUMENTDB_USERNAME}
-      - DOCUMENTDB_PASSWORD=${DOCUMENTDB_PASSWORD}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-mongodb-ce}
+      - DOCUMENTDB_HOST=mongodb
+      - DOCUMENTDB_PORT=27017
       - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
-      - DOCUMENTDB_NAMESPACE=${DOCUMENTDB_NAMESPACE:-default}
-      - DOCUMENTDB_USE_TLS=${DOCUMENTDB_USE_TLS:-false}
-      - DOCUMENTDB_TLS_CA_FILE=${DOCUMENTDB_TLS_CA_FILE:-}
-      - DOCUMENTDB_USE_IAM=${DOCUMENTDB_USE_IAM:-false}
-      - DOCUMENTDB_REPLICA_SET=${DOCUMENTDB_REPLICA_SET:-rs0}
-      - DOCUMENTDB_READ_PREFERENCE=${DOCUMENTDB_READ_PREFERENCE:-secondaryPreferred}
-      # Embeddings Configuration
-      - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER:-sentence-transformers}
-      - EMBEDDINGS_MODEL_NAME=${EMBEDDINGS_MODEL_NAME:-all-MiniLM-L6-v2}
-      - EMBEDDINGS_MODEL_DIMENSIONS=${EMBEDDINGS_MODEL_DIMENSIONS:-384}
-      - EMBEDDINGS_API_KEY=${EMBEDDINGS_API_KEY}
-      - EMBEDDINGS_API_BASE=${EMBEDDINGS_API_BASE}
-      - EMBEDDINGS_AWS_REGION=${EMBEDDINGS_AWS_REGION:-us-east-1}
-      # Federation Peer Sync Configuration
-      - FEDERATION_TOKEN_ENDPOINT=${FEDERATION_TOKEN_ENDPOINT}
-      - FEDERATION_CLIENT_ID=${FEDERATION_CLIENT_ID}
-      - FEDERATION_CLIENT_SECRET=${FEDERATION_CLIENT_SECRET}
-      # Federation Token Encryption (for encrypting federation_token before storage)
-      - FEDERATION_ENCRYPTION_KEY=${FEDERATION_ENCRYPTION_KEY:-}
-      # Federation static token auth
-      - FEDERATION_STATIC_TOKEN_AUTH_ENABLED=${FEDERATION_STATIC_TOKEN_AUTH_ENABLED:-false}
-      - FEDERATION_STATIC_TOKEN=${FEDERATION_STATIC_TOKEN:-}
-      # Auth server config (mirrored for config panel visibility)
-      - OAUTH_STORE_TOKENS_IN_SESSION=${OAUTH_STORE_TOKENS_IN_SESSION:-false}
-      - REGISTRY_STATIC_TOKEN_AUTH_ENABLED=${REGISTRY_STATIC_TOKEN_AUTH_ENABLED:-false}
-      - REGISTRY_API_TOKEN=${REGISTRY_API_TOKEN:-}
-      - MAX_TOKENS_PER_USER_PER_HOUR=${MAX_TOKENS_PER_USER_PER_HOUR:-100}
+      - DOCUMENTDB_REPLICA_SET=rs0
     ports:
-      - "80:8080"   # Map host 80 to container 8080 (non-root nginx)
-      - "443:8443"  # Map host 443 to container 8443 (non-root nginx)
+      - "80:8080"
+      - "443:8443"
       - "7860:7860"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      # User-managed content (bind mounts)
       - mcp-servers:/app/registry/servers
       - mcp-agents:/app/registry/agents
       - mcp-models:/app/registry/models
       - mcp-auth-scopes:/app/auth_server/scopes.yml
-      - mcp-federation-config:/app/config/federation.json
-      - mcp-ssl:/etc/ssl:ro
-      - aws-config:/root/.aws:ro
-      # Application-managed (named volumes with proper permissions)
       - registry-logs:/app/logs
-      - registry-scans:/app/security_scans
     depends_on:
       auth-server:
         condition: service_started
-  #    metrics-service:
-  #      condition: service_healthy
-  #    mongodb-init:
-  #      condition: service_completed_successfully
-  #  restart: unless-stopped
-
-  # Metrics Collection Service
-  #metrics-service:
-  #  build:
-  #    context: metrics-service
-  #    dockerfile: Dockerfile
-  #  environment:
-  #    - METRICS_SERVICE_PORT=8890
-  #    - METRICS_SERVICE_HOST=0.0.0.0
-  #    - SQLITE_DB_PATH=/var/lib/sqlite/metrics.db
-  #    - METRICS_RETENTION_DAYS=90
-  #    - METRICS_API_KEY_AUTH=${METRICS_API_KEY_AUTH_SERVER}
-  #    - METRICS_API_KEY_REGISTRY=${METRICS_API_KEY_REGISTRY}
-  #    - METRICS_API_KEY_MCPGW=${METRICS_API_KEY_MCPGW_SERVER}
-  #    - OTEL_SERVICE_NAME=mcp-metrics-service
-  #    - OTEL_PROMETHEUS_ENABLED=true
-  #    - OTEL_PROMETHEUS_PORT=9465
-  #    - METRICS_RATE_LIMIT=1000
-  #  ports:
-  #    - "8890:8890"
-  #    - "9465:9465"  # Prometheus metrics endpoint
-  #  security_opt:
-  #    - no-new-privileges:true
-  #  cap_drop:
-  #    - ALL
-  #  volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      - metrics-db-data:/var/lib/sqlite
-      # Application-managed (named volume with proper permissions)
-      - metrics-logs:/app/logs
-    depends_on:
-      - metrics-db
+      mongodb-init:
+        condition: service_completed_successfully
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8890/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Auth service (separate and scalable)
   auth-server:
     build:
       context: .
@@ -265,247 +77,19 @@ services:
     environment:
       - REGISTRY_URL=${REGISTRY_URL}
       - SECRET_KEY=${SECRET_KEY}
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - GITHUB_ENABLED=${GITHUB_ENABLED:-false}
-      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID}
-      - COGNITO_CLIENT_SECRET=${COGNITO_CLIENT_SECRET}
-      - COGNITO_USER_POOL_ID=${COGNITO_USER_POOL_ID}
-      - COGNITO_DOMAIN=${COGNITO_DOMAIN:-auto}
-      - COGNITO_ENABLED=${COGNITO_ENABLED:-false}
-      - AWS_REGION=${AWS_REGION:-us-east-1}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_ENABLED=${GOOGLE_ENABLED:-false}
-      # Metrics configuration
-      - METRICS_SERVICE_URL=http://metrics-service:8890
-      - METRICS_API_KEY=${METRICS_API_KEY_AUTH_SERVER}
-      # Keycloak configuration
-      - AUTH_PROVIDER=${AUTH_PROVIDER:-cognito}  # 'cognito' or 'keycloak'
-      - KEYCLOAK_ENABLED=${KEYCLOAK_ENABLED:-true}  # Enable Keycloak by default
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
-      - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL:-http://localhost:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-mcp-gateway}
-      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-mcp-gateway-web}
-      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
-      - KEYCLOAK_M2M_CLIENT_ID=${KEYCLOAK_M2M_CLIENT_ID:-mcp-gateway-m2m}
-      - KEYCLOAK_M2M_CLIENT_SECRET=${KEYCLOAK_M2M_CLIENT_SECRET}
-      # Entra ID configuration
-      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID}
-      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID}
-      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
-      - ENTRA_ENABLED=${ENTRA_ENABLED:-false}
-      # Storage Backend Configuration
-      - STORAGE_BACKEND=${STORAGE_BACKEND:-file}
-      # DocumentDB/MongoDB Configuration (when STORAGE_BACKEND=documentdb or mongodb-ce)
-      - DOCUMENTDB_HOST=${DOCUMENTDB_HOST:-mongodb}
-      - DOCUMENTDB_PORT=${DOCUMENTDB_PORT:-27017}
-      - DOCUMENTDB_USERNAME=${DOCUMENTDB_USERNAME}
-      - DOCUMENTDB_PASSWORD=${DOCUMENTDB_PASSWORD}
-      - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
-      - DOCUMENTDB_NAMESPACE=${DOCUMENTDB_NAMESPACE:-default}
-      - DOCUMENTDB_USE_TLS=${DOCUMENTDB_USE_TLS:-false}
-      - DOCUMENTDB_TLS_CA_FILE=${DOCUMENTDB_TLS_CA_FILE}
-      - DOCUMENTDB_USE_IAM=${DOCUMENTDB_USE_IAM:-false}
-      - DOCUMENTDB_REPLICA_SET=${DOCUMENTDB_REPLICA_SET:-rs0}
-      - DOCUMENTDB_READ_PREFERENCE=${DOCUMENTDB_READ_PREFERENCE:-secondaryPreferred}
-      # Registry API static token auth (IdP-independent access)
-      - REGISTRY_STATIC_TOKEN_AUTH_ENABLED=${REGISTRY_STATIC_TOKEN_AUTH_ENABLED:-false}
-      - REGISTRY_API_TOKEN=${REGISTRY_API_TOKEN:-}
-      # Federation static token auth (scoped access for peer registries)
-      - FEDERATION_STATIC_TOKEN_AUTH_ENABLED=${FEDERATION_STATIC_TOKEN_AUTH_ENABLED:-false}
-      - FEDERATION_STATIC_TOKEN=${FEDERATION_STATIC_TOKEN:-}
-      # OAuth token storage in session (set to false for Entra ID large tokens)
-      - OAUTH_STORE_TOKENS_IN_SESSION=${OAUTH_STORE_TOKENS_IN_SESSION:-false}
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-keycloak}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-mongodb-ce}
+      - DOCUMENTDB_HOST=mongodb
+      - DOCUMENTDB_PORT=27017
     ports:
       - "8888:8888"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      # Application-managed (named volume with proper permissions)
       - auth-logs:/app/logs
-      # - mcp-auth-scopes:/app/scopes.yml
     depends_on:
-  #    metrics-service:
-  #      condition: service_healthy
-  #    mongodb-init:
-  #      condition: service_completed_successfully
-  #  restart: unless-stopped
-
-  # Current Time MCP Server
-  currenttime-server:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.mcp-server-light
-      args:
-        SERVER_DIR: servers/currenttime
-    environment:
-      - HOST=0.0.0.0
-      - PORT=8000
-      - MCP_TRANSPORT=streamable-http
-    ports:
-      - "8000:8000"
+      mongodb-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
-  # Financial Info MCP Server
-  fininfo-server:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.mcp-server-light
-      args:
-        SERVER_DIR: servers/fininfo
-    environment:
-      - PORT=8001
-      - SECRET_KEY=${SECRET_KEY}
-    volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      - mcp-fininfo-secrets:/app/fininfo/
-    ports:
-      - "8001:8001"
-    restart: unless-stopped
-
-  # MCP Gateway Server
-  mcpgw-server:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.mcp-server
-      args:
-        SERVER_DIR: servers/mcpgw
-    environment:
-      - HOST=0.0.0.0
-      - PORT=8003
-      - REGISTRY_BASE_URL=http://registry:8080
-    volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      - mcp-servers:/app/registry/servers
-      - mcp-models:/app/registry/models
-      - mcp-auth-scopes:/app/auth_server/scopes.yml
-    ports:
-      - "8003:8003"
-    depends_on:
-      - registry
-    restart: unless-stopped
-
-  # Real Server Fake Tools MCP Server
-  realserverfaketools-server:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.mcp-server-light
-      args:
-        SERVER_DIR: servers/realserverfaketools
-    environment:
-      - PORT=8002
-    ports:
-      - "8002:8002"
-    restart: unless-stopped
-
-  # SQLite container for metrics database
-  #metrics-db:
-  #  build:
-  #    context: .
-  #    dockerfile: docker/Dockerfile.metrics-db
-  #  security_opt:
-  #    - no-new-privileges:true
-  #  cap_drop:
-  #    - ALL
-  #  volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      - metrics-db-data:/var/lib/sqlite
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "sqlite3", "/var/lib/sqlite/metrics.db", ".tables"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Prometheus for metrics collection
-  #prometheus:
-  #  image: prom/prometheus:latest
-  #  ports:
-  #    - "9090:9090"
-  #  volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    restart: unless-stopped
-
-  # Grafana for metrics visualization
-  #grafana:
-  #  image: grafana/grafana:12.3.1
-  #  ports:
-  #    - "3000:3000"
-  #  environment:
-  #    - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
-  #    - GF_USERS_ALLOW_SIGN_UP=false
-  #    - GF_AUTH_ANONYMOUS_ENABLED=false
-  #  volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      - grafana-data:/var/lib/grafana
-      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-
-  # PostgreSQL database for Keycloak
   keycloak-db:
     image: postgres:16-alpine
     environment:
@@ -513,15 +97,6 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
     volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
       - keycloak_db_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
@@ -530,86 +105,33 @@ services:
       timeout: 5s
       retries: 5
 
-  # Keycloak Identity Provider
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
-    command: start-dev  # Use 'start' for production with proper SSL
+    command: start-dev
     environment:
-      # Database configuration
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
-
-      # Admin credentials
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-
-      # HTTP configuration
       KC_HTTP_ENABLED: 'true'
       KC_HTTP_PORT: 8080
-      KC_HOSTNAME_STRICT: 'false'
-      KC_HOSTNAME_STRICT_HTTPS: 'false'
-      KC_PROXY: edge  # Running behind nginx
-
-      # Frontend URL for external JWT issuer
-      KC_FRONTEND_URL: ${KEYCLOAK_EXTERNAL_URL:-http://localhost:8080}
-
-      # Features
-      KC_FEATURES: token-exchange,admin-api
-
-      # Logging
-      KC_LOG_LEVEL: INFO
-      
+      KC_PROXY: edge
     ports:
       - "8080:8080"
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     depends_on:
       keycloak-db:
         condition: service_healthy
-    volumes:
-  mcp-servers:
-  mcp-agents:
-  mcp-models:
-  mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-      - ./keycloak/themes:/opt/keycloak/themes
-      - ./keycloak/providers:/opt/keycloak/providers
-      - ./keycloak/import:/opt/keycloak/data/import
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
 volumes:
+  mongodb-data:
+  mongodb-config:
+  keycloak_db_data:
   mcp-servers:
   mcp-agents:
   mcp-models:
   mcp-auth-scopes:
-  mcp-federation-config:
-  mcp-ssl:
-  aws-config:
-  mcp-fininfo-secrets:
-
-  ssl_data:
-  keycloak_db_data:
-  metrics-db-data:
-  prometheus-data:
-  grafana-data:
-  mongodb-data:
-  mongodb-config:
-  # Application logs and scans (managed by containers, proper permissions)
   registry-logs:
-  registry-scans:
   auth-logs:
-  metrics-logs:
