@@ -311,7 +311,7 @@ async def map_groups_to_scopes(groups: list[str]) -> list[str]:
                 logger.debug(f"Mapped group '{group}' to scopes: {group_scopes}")
             else:
                 logger.debug(f"No scope mapping found for group: {group}")
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Error querying group mappings from DocumentDB: {e}", exc_info=True)
         # Fall back to in-memory config if DocumentDB query fails
         group_mappings = SCOPES_CONFIG.get("group_mappings", {})
@@ -387,7 +387,7 @@ async def validate_session_cookie(cookie_value: str) -> dict[str, any]:
     except BadSignature:
         logger.warning("Invalid session cookie signature")
         raise ValueError("Invalid session cookie")
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Session cookie validation error: {e}")
         raise ValueError(f"Session cookie validation failed: {e}")
 
@@ -417,7 +417,7 @@ def parse_server_and_tool_from_url(original_url: str) -> tuple[str | None, str |
         logger.debug(f"Parsed server name '{server_name}' from URL path: {path}")
         return server_name, None  # Tool name would need to be extracted from request payload
 
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Failed to parse server/tool from URL {original_url}: {e}")
         return None, None
 
@@ -572,7 +572,7 @@ async def validate_server_tool_access(
         logger.info("=== VALIDATE_SERVER_TOOL_ACCESS END: DENIED ===")
         return False
 
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Error validating server/tool access: {e}")
         logger.info("=== VALIDATE_SERVER_TOOL_ACCESS END: ERROR ===")
         return False  # Deny access on error
@@ -652,7 +652,7 @@ async def lifespan(app: FastAPI):
         logger.info(
             f"Loaded scopes configuration on startup with {len(SCOPES_CONFIG.get('group_mappings', {}))} group mappings"
         )
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Failed to load scopes configuration on startup: {e}", exc_info=True)
         # Fall back to empty config
         SCOPES_CONFIG = {"group_mappings": {}}
@@ -682,7 +682,7 @@ async def startup_event():
         logger.info(
             f"Loaded scopes configuration on startup with {len(SCOPES_CONFIG.get('group_mappings', {}))} group mappings"
         )
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Failed to load scopes configuration on startup: {e}", exc_info=True)
         # Fall back to empty config
         SCOPES_CONFIG = {"group_mappings": {}}
@@ -767,7 +767,7 @@ class SimplifiedCognitoValidator:
                     f"Retrieved JWKS for {cache_key} with {len(jwks.get('keys', []))} keys"
                 )
 
-            except Exception as e:
+            except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                 logger.error(f"Failed to retrieve JWKS from {jwks_url}: {e}")
                 raise ValueError(f"Cannot retrieve JWKS: {e}")
 
@@ -867,7 +867,7 @@ class SimplifiedCognitoValidator:
             error_msg = f"Invalid token: {e}"
             logger.warning(error_msg)
             raise ValueError(error_msg)
-        except Exception as e:
+        except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
             error_msg = f"JWT validation error: {e}"
             logger.error(error_msg)
             raise ValueError(f"Token validation failed: {e}")
@@ -927,7 +927,7 @@ class SimplifiedCognitoValidator:
                 logger.error(f"Cognito error {error_code}: {error_message}")
                 raise ValueError(f"Token validation failed: {error_message}")
 
-        except Exception as e:
+        except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
             logger.error(f"Boto3 validation error: {e}")
             raise ValueError(f"Token validation failed: {e}")
 
@@ -1000,7 +1000,7 @@ class SimplifiedCognitoValidator:
             error_msg = f"Invalid self-signed token: {e}"
             logger.warning(error_msg)
             raise ValueError(error_msg)
-        except Exception as e:
+        except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
             error_msg = f"Self-signed token validation error: {e}"
             logger.error(error_msg)
             raise ValueError(f"Self-signed token validation failed: {e}")
@@ -1031,7 +1031,7 @@ class SimplifiedCognitoValidator:
             if unverified_claims.get("iss") == JWT_ISSUER:
                 logger.debug("Token appears to be self-signed, validating...")
                 return self.validate_self_signed_token(access_token)
-        except Exception as e:
+        except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
             # Not our token or malformed, continue to Cognito validation
             logger.debug(f"Token is not self-signed or malformed, falling back to Cognito: {e}")
 
@@ -1219,7 +1219,7 @@ async def validate_request(request: Request):
                 logger.info(
                     f"Extracted server_name '{server_name_from_url}' and endpoint '{endpoint_from_url}' from original_url: {original_url}"
                 )
-            except Exception as e:
+            except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                 logger.warning(
                     f"Failed to extract server_name from original_url {original_url}: {e}"
                 )
@@ -1240,7 +1240,7 @@ async def validate_request(request: Request):
             logger.warning(f"Could not decode body as UTF-8: {e}")
         except json.JSONDecodeError as e:
             logger.warning(f"Could not parse JSON RPC payload: {e}")
-        except Exception as e:
+        except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
             logger.error(f"Error reading request payload: {type(e).__name__}: {e}")
 
         # Log request for debugging with anonymized IP
@@ -1478,7 +1478,7 @@ async def validate_request(request: Request):
                         region=region,
                     )
 
-            except Exception as e:
+            except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                 logger.error(f"Authentication provider error: {e}")
                 raise HTTPException(
                     status_code=500,
@@ -1520,7 +1520,7 @@ async def validate_request(request: Request):
                         logger.info(f"Extracted tool name from JSON-RPC payload: '{tool_name}'")
                     else:
                         logger.warning(f"Payload is not a dictionary: {type(request_payload)}")
-                except Exception as e:
+                except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                     logger.error(f"Error processing request payload for tool extraction: {e}")
 
         # Validate scope-based access if we have server/tool information
@@ -1641,7 +1641,7 @@ async def validate_request(request: Request):
                         user_agent=request.headers.get("User-Agent"),
                     )
                     logger.debug(f"MCP access logged for {server_name}")
-                except Exception as e:
+                except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                     # Don't fail the request if logging fails
                     logger.warning(f"Failed to log MCP access event: {e}")
 
@@ -1709,7 +1709,7 @@ async def validate_request(request: Request):
             detail=f"Internal validation error: {str(e)}",
             headers={"Connection": "close"},
         )
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Unexpected error during validation: {e}")
         raise HTTPException(
             status_code=500,
@@ -1747,7 +1747,7 @@ async def get_auth_config():
                 "optional_headers": ["X-Region: <region> (default: us-east-1)"],
                 "provider_info": provider_info,
             }
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Error getting auth config: {e}")
         return {
             "auth_type": "unknown",
@@ -1992,7 +1992,7 @@ async def generate_user_token(request: GenerateTokenRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Unexpected error generating token: {e}")
         raise HTTPException(
             status_code=500,
@@ -2066,7 +2066,7 @@ async def reload_scopes(request: Request, authorization: str | None = Header(Non
                 "group_mappings_count": len(SCOPES_CONFIG.get("group_mappings", {})),
             },
         )
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Failed to reload scopes configuration: {e}")
         raise HTTPException(status_code=500, detail="Failed to reload scopes configuration")
 
@@ -2128,7 +2128,7 @@ def load_oauth2_config():
         # Substitute environment variables in configuration
         processed_config = substitute_env_vars(config)
         return processed_config
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Failed to load OAuth2 configuration: {e}")
         return {"providers": {}, "session": {}, "registry": {}}
 
@@ -2225,7 +2225,7 @@ def get_mcp_logger() -> MCPLogger | None:
                         _mcp_audit_repository = DocumentDBAuditRepository()
                         audit_repository = _mcp_audit_repository
                         logger.info("MCP audit MongoDB repository initialized")
-                    except Exception as e:
+                    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                         logger.warning(f"Failed to initialize MCP audit MongoDB repository: {e}")
                         mongodb_enabled = False
 
@@ -2244,7 +2244,7 @@ def get_mcp_logger() -> MCPLogger | None:
                 )
             else:
                 logger.info("MCP audit logging is disabled")
-        except Exception as e:
+        except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
             logger.warning(f"Failed to initialize MCP audit logger: {e}")
             _mcp_logger = None
 
@@ -2328,7 +2328,7 @@ async def get_oauth2_providers():
 
         providers = get_enabled_providers()
         return {"providers": providers}
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Error getting OAuth2 providers: {e}")
         return {"providers": [], "error": str(e)}
 
@@ -2414,7 +2414,7 @@ async def oauth2_login(provider: str, request: Request, redirect_uri: str = None
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Error initiating OAuth2 login for {provider}: {e}")
         error_url = OAUTH2_CONFIG.get("registry", {}).get("error_redirect", "/login")
         return RedirectResponse(url=f"{error_url}?error=oauth2_init_failed", status_code=302)
@@ -2550,7 +2550,7 @@ async def oauth2_callback(
                         )
                         raise ValueError("Missing ID token")
 
-            except Exception as e:
+            except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                 logger.warning(
                     f"JWT token validation failed: {e}, falling back to userInfo endpoint"
                 )
@@ -2592,7 +2592,7 @@ async def oauth2_callback(
                     logger.warning("No ID token found in Entra response, falling back to userInfo")
                     raise ValueError("Missing ID token")
 
-            except Exception as e:
+            except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                 logger.warning(
                     f"Entra ID token parsing failed: {e}, falling back to userInfo endpoint"
                 )
@@ -2687,7 +2687,7 @@ async def oauth2_callback(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Error in OAuth2 callback for {provider}: {e}")
         error_url = OAUTH2_CONFIG.get("registry", {}).get("error_redirect", "/login")
         return RedirectResponse(url=f"{error_url}?error=oauth2_callback_failed", status_code=302)
@@ -2851,7 +2851,7 @@ async def oauth2_logout(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e: logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
         logger.error(f"Error initiating logout for {provider}: {e}")
         # Fallback to local redirect
         redirect_url = redirect_uri or OAUTH2_CONFIG.get("registry", {}).get(
