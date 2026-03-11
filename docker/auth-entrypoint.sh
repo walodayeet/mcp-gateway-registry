@@ -37,7 +37,7 @@ port = int(os.getenv('DOCUMENTDB_PORT', '27017'))
 user = os.getenv('DOCUMENTDB_USERNAME', '')
 pwd = os.getenv('DOCUMENTDB_PASSWORD', '')
 backend = os.getenv('STORAGE_BACKEND', 'mongodb-ce')
-use_tls = os.getenv('DOCUMENTDB_USE_TLS', 'true').lower() == 'true'
+use_tls = os.getenv('DOCUMENTDB_USE_TLS', 'false').lower() == 'true'
 ca_file = os.getenv('DOCUMENTDB_TLS_CA_FILE', '/app/certs/global-bundle.pem')
 auth = 'SCRAM-SHA-256' if backend == 'mongodb-ce' else 'SCRAM-SHA-1'
 if user and pwd:
