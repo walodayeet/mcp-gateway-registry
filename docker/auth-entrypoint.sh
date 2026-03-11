@@ -19,5 +19,4 @@ fi
 
 cd /app && source /app/.venv/bin/activate
 export AUTH_SERVER_HOST=0.0.0.0
-# server.py is in root of /app according to Dockerfile
 python3 server.py
