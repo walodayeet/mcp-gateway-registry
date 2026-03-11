@@ -7,8 +7,7 @@ if [ -n "$DOCUMENTDB_HOST" ]; then
     source /app/.venv/bin/activate
     python3 <<'PYEOF'
 import pymongo, os, time
-host = os.getenv('DOCUMENTDB_HOST', 'mongodb')
-uri = f'mongodb://{host}:27017/'
+uri = f'mongodb://{os.getenv("DOCUMENTDB_HOST", "mongodb")}:27017/'
 while True:
     try:
         pymongo.MongoClient(uri, serverSelectionTimeoutMS=2000).admin.command('ping')
