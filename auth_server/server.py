@@ -312,7 +312,7 @@ async def map_groups_to_scopes(groups: list[str]) -> list[str]:
             else:
                 logger.debug(f"No scope mapping found for group: {group}")
     except Exception as e:
-        logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
+        logger.error(f"Auth Server Error: {e}", exc_info=True)
         # Fall back to in-memory config if DocumentDB query fails
         group_mappings = SCOPES_CONFIG.get("group_mappings", {})
         for group in groups:
