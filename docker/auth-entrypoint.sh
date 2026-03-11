@@ -38,6 +38,7 @@ user = os.getenv('DOCUMENTDB_USERNAME', '')
 pwd = os.getenv('DOCUMENTDB_PASSWORD', '')
 backend = os.getenv('STORAGE_BACKEND', 'mongodb-ce')
 use_tls = os.getenv('DOCUMENTDB_USE_TLS', 'false').lower() == 'true'
+if backend == 'mongodb-ce': use_tls = False
 ca_file = os.getenv('DOCUMENTDB_TLS_CA_FILE', '/app/certs/global-bundle.pem')
 auth = 'SCRAM-SHA-256' if backend == 'mongodb-ce' else 'SCRAM-SHA-1'
 if user and pwd:
@@ -48,7 +49,7 @@ else:
 tls_options = {}
 if use_tls:
     tls_options['tls'] = True
-    if os.path.exists(ca_file): tls_options['tlsCAFile'] = ca_file
+    if use_tls and os.path.exists(ca_file): tls_options['tlsCAFile'] = ca_file
 while True:
     try:
         c = pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000, **tls_options)
