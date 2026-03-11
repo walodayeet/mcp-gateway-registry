@@ -21,18 +21,45 @@ PYEOF
     deactivate
 fi
 
-# --- Nginx Non-Root Permission Fix ---
-# Create writable directories for Nginx
-mkdir -p /tmp/nginx/body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi /tmp/nginx/run
+# --- Comprehensive Nginx Non-Root Fix ---
+# Create writable directories for Nginx in /tmp
+mkdir -p /tmp/nginx/body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi /tmp/nginx/run /tmp/nginx/log
 
-# Modify main nginx.conf to use writable paths and remove root-only directives
-if [ -f /etc/nginx/nginx.conf ]; then
-    # Remove user directive
-    sed -i 's/^user /#user /g' /etc/nginx/nginx.conf
-    # Change pid location to /tmp
-    sed -i 's|pid /run/nginx.pid;|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf
-    sed -i 's|pid /var/run/nginx.pid;|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf
-fi
+# Force Nginx to use writable paths for everything
+cat << 'NGINX_CONF' > /tmp/nginx.conf
+worker_processes auto;
+pid /tmp/nginx/run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
+
+events {
+    worker_connections 768;
+}
+
+http {
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    access_log /tmp/nginx/log/access.log;
+    error_log /tmp/nginx/log/error.log;
+
+    client_body_temp_path /tmp/nginx/body;
+    proxy_temp_path /tmp/nginx/proxy;
+    fastcgi_temp_path /tmp/nginx/fastcgi;
+    uwsgi_temp_path /tmp/nginx/uwsgi;
+    scgi_temp_path /tmp/nginx/scgi;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+NGINX_CONF
+
+# Backup and overwrite main nginx.conf
+cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak || true
+cp /tmp/nginx.conf /etc/nginx/nginx.conf
 
 # --- Registry App Startup ---
 cd /app && source /app/.venv/bin/activate
@@ -51,6 +78,6 @@ for i in {1..45}; do
     sleep 2
 done
 
-# Start Nginx using the validated config
-echo "Starting Nginx..."
+# Start Nginx in foreground
+echo "Starting Nginx (Non-Root)..."
 nginx -g 'daemon off;'
