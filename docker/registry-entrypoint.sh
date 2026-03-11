@@ -66,7 +66,7 @@ for i in {1..20}; do
         echo "Nginx PID validated: $(cat /tmp/nginx/run/nginx.pid)"
         break
     fi
-    echo "Waiting for Nginx PID file..."
+    echo "Waiting for Nginx PID file... ($i/20)"
     sleep 1
 done
 
