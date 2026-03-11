@@ -42,21 +42,26 @@ services:
       context: .
       dockerfile: docker/Dockerfile.registry
     environment:
-      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-with-gateway}
-      - REGISTRY_MODE=${REGISTRY_MODE:-full}
+      - DEPLOYMENT_MODE=with-gateway
+      - REGISTRY_MODE=full
       - SECRET_KEY=${SECRET_KEY}
-      - AUTH_SERVER_URL=${AUTH_SERVER_URL}
+      - AUTH_SERVER_URL=http://auth-server:8888
+      - AUTH_SERVER_EXTERNAL_URL=${AUTH_SERVER_EXTERNAL_URL}
       - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
-      - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
+      - DOCUMENTDB_DATABASE=mcp_registry
       - DOCUMENTDB_REPLICA_SET=rs0
       - DOCUMENTDB_USE_TLS=false
-      - AUTH_PROVIDER=${AUTH_PROVIDER:-keycloak}
+      - AUTH_PROVIDER=keycloak
       - KEYCLOAK_ENABLED=true
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_REALM=mcp-gateway
       - KEYCLOAK_CLIENT_ID=mcp-gateway-web
+      - COGNITO_ENABLED=false
+      - GITHUB_ENABLED=false
+      - ENTRA_ENABLED=false
+      - GOOGLE_ENABLED=false
     ports:
       - "8087:8080"
       - "8443:8443"
@@ -80,12 +85,16 @@ services:
     environment:
       - REGISTRY_URL=${REGISTRY_URL}
       - SECRET_KEY=${SECRET_KEY}
-      - AUTH_PROVIDER=${AUTH_PROVIDER:-keycloak}
+      - AUTH_PROVIDER=keycloak
       - KEYCLOAK_ENABLED=true
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL:-http://localhost:8080}
       - KEYCLOAK_REALM=mcp-gateway
       - KEYCLOAK_CLIENT_ID=mcp-gateway-web
+      - COGNITO_ENABLED=false
+      - GITHUB_ENABLED=false
+      - ENTRA_ENABLED=false
+      - GOOGLE_ENABLED=false
       - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
