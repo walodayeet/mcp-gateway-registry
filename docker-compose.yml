@@ -43,7 +43,6 @@ services:
       - REGISTRY_MODE=full
       - SECRET_KEY=${SECRET_KEY}
       - AUTH_SERVER_URL=http://auth-server:8888
-      - AUTH_SERVER_EXTERNAL_URL=${AUTH_SERVER_EXTERNAL_URL}
       - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
@@ -98,22 +97,6 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  mcpgw-server:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.mcp-server
-      args:
-        SERVER_DIR: servers/mcpgw
-    environment:
-      - HOST=0.0.0.0
-      - PORT=8003
-      - REGISTRY_BASE_URL=http://registry:8080
-    ports:
-      - "8003:8003"
-    depends_on:
-      - registry
-    restart: unless-stopped
-
   keycloak-db:
     image: postgres:16-alpine
     environment:
@@ -121,7 +104,7 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
     volumes:
-      - keycloak_db_data-v3:/var/lib/postgresql/data
+      - keycloak-db-data-v3:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak"]
