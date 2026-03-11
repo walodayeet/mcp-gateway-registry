@@ -312,7 +312,6 @@ async def map_groups_to_scopes(groups: list[str]) -> list[str]:
             else:
                 logger.debug(f"No scope mapping found for group: {group}")
     except Exception as e:
-        logger.error(f"Auth Server Error: {e}", exc_info=True)
         # Fall back to in-memory config if DocumentDB query fails
         group_mappings = SCOPES_CONFIG.get("group_mappings", {})
         for group in groups:
@@ -772,7 +771,9 @@ class SimplifiedCognitoValidator:
                     f"Retrieved JWKS for {cache_key} with {len(jwks.get('keys', []))} keys"
                 )
 
-    except Exception as e:
+        except Exception as e:
+            logger.error(f'Failed to retrieve JWKS: {e}', exc_info=True)
+            raise ValueError(f'Cannot retrieve JWKS: {e}')
         logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
                 logger.error(f"Failed to retrieve JWKS from {jwks_url}: {e}")
                 raise ValueError(f"Cannot retrieve JWKS: {e}")
