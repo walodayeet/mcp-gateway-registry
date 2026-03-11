@@ -7,8 +7,7 @@ if [ -n "$DOCUMENTDB_HOST" ]; then
     source /app/.venv/bin/activate
     python3 <<'PYEOF'
 import pymongo, os, time
-host = os.getenv('DOCUMENTDB_HOST', 'mongodb')
-uri = f'mongodb://{host}:27017/'
+uri = f'mongodb://{os.getenv("DOCUMENTDB_HOST", "mongodb")}:27017/'
 while True:
     try:
         pymongo.MongoClient(uri, serverSelectionTimeoutMS=2000).admin.command('ping')
@@ -16,15 +15,13 @@ while True:
         break
     except: 
         print('Waiting for MongoDB...')
-        time.sleep(2)
+        time.sleep(5)
 PYEOF
     deactivate
 fi
 
-# --- Nginx Non-Root Hardening ---
+# --- Nginx Non-Root Fix ---
 mkdir -p /tmp/nginx/body /tmp/nginx/proxy /tmp/nginx/run /tmp/nginx/log /etc/nginx/conf.d
-
-# Force global Nginx config to use /tmp
 cat << 'NGINX_GLOBAL' > /etc/nginx/nginx.conf
 worker_processes auto;
 pid /tmp/nginx/run/nginx.pid;
@@ -41,17 +38,17 @@ http {
 }
 NGINX_GLOBAL
 
-# --- Start Registry App ---
+# Start Registry App
 cd /app && source /app/.venv/bin/activate
-echo "Launching Registry app..."
+echo "Starting Registry app..."
 uvicorn registry.main:app --host 0.0.0.0 --port 7860 --proxy-headers --forwarded-allow-ips='*' &
 
-# --- Wait for Valid Config ---
+# Wait for config
 echo "Waiting for Registry to generate Nginx config..."
-for i in {1..45}; do
+for i in {1..60}; do
     if [ -f "/etc/nginx/conf.d/nginx_rev_proxy.conf" ]; then
         if ! grep -q "{{" "/etc/nginx/conf.d/nginx_rev_proxy.conf"; then
-            echo "Validated config found."
+            echo "Config ready!"
             break
         fi
     fi
@@ -61,14 +58,13 @@ done
 echo "Starting Nginx..."
 nginx
 
-# CRITICAL: Wait for Nginx to write its PID and ensure it is not empty
-echo "Verifying Nginx PID..."
-for i in {1..20}; do
-    if [ -s "/tmp/nginx/run/nginx.pid" ] && [ -n "$(cat /tmp/nginx/run/nginx.pid)" ]; then
-        echo "Nginx PID validated: $(cat /tmp/nginx/run/nginx.pid)"
+# CRITICAL: Wait for PID file to be populated to prevent reload crashes
+for i in {1..10}; do
+    if [ -s "/tmp/nginx/run/nginx.pid" ]; then
+        echo "Nginx PID ready: $(cat /tmp/nginx/run/nginx.pid)"
         break
     fi
-    echo "Waiting for valid PID... ($i/20)"
+    echo "Waiting for Nginx PID file..."
     sleep 1
 done
 
