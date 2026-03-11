@@ -2,6 +2,10 @@
 set -e
 echo "Starting Auth Server Setup..."
 
+# Fix internal paths: ensure the loader can find scopes.yml
+mkdir -p /app/auth_server
+[ -f /app/scopes.yml ] && ln -sf /app/scopes.yml /app/auth_server/scopes.yml
+
 if [ -n "$DOCUMENTDB_HOST" ]; then
     source /app/.venv/bin/activate
     python3 <<'PYEOF'
@@ -14,7 +18,6 @@ while True:
         break
     except: time.sleep(2)
 PYEOF
-    deactivate
 fi
 
 cd /app && source /app/.venv/bin/activate

@@ -7,7 +7,8 @@ if [ -n "$DOCUMENTDB_HOST" ]; then
     source /app/.venv/bin/activate
     python3 <<'PYEOF'
 import pymongo, os, time
-uri = f'mongodb://{os.getenv("DOCUMENTDB_HOST", "mongodb")}:27017/'
+host = os.getenv('DOCUMENTDB_HOST', 'mongodb')
+uri = f'mongodb://{host}:27017/'
 while True:
     try:
         pymongo.MongoClient(uri, serverSelectionTimeoutMS=2000).admin.command('ping')
@@ -56,7 +57,7 @@ for i in {1..60}; do
 done
 
 echo "Starting Nginx..."
-nginx &
+nginx
 
 # CRITICAL: Wait for PID file to be populated and valid to prevent reload crashes
 echo "Validating Nginx PID..."
@@ -65,6 +66,7 @@ for i in {1..20}; do
         echo "Nginx PID validated: $(cat /tmp/nginx/run/nginx.pid)"
         break
     fi
+    echo "Waiting for Nginx PID file... ($i/20)"
     sleep 1
 done
 
