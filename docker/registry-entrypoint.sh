@@ -23,7 +23,6 @@ fi
 
 # --- Nginx Non-Root Hardening ---
 mkdir -p /tmp/nginx/body /tmp/nginx/proxy /tmp/nginx/run /tmp/nginx/log /etc/nginx/conf.d
-rm -f /etc/nginx/conf.d/nginx_rev_proxy.conf
 
 # Force global Nginx config to use /tmp
 cat << 'NGINX_GLOBAL' > /etc/nginx/nginx.conf
@@ -47,7 +46,7 @@ cd /app && source /app/.venv/bin/activate
 echo "Launching Registry app..."
 uvicorn registry.main:app --host 0.0.0.0 --port 7860 --proxy-headers --forwarded-allow-ips='*' &
 
-# --- Wait for Config and VALID PID ---
+# --- Wait for Valid Config ---
 echo "Waiting for Registry to generate Nginx config..."
 for i in {1..45}; do
     if [ -f "/etc/nginx/conf.d/nginx_rev_proxy.conf" ]; then
@@ -60,17 +59,17 @@ for i in {1..45}; do
 done
 
 echo "Starting Nginx..."
-nginx &
+nginx
 
-# CRITICAL: Wait for Nginx to write its PID before continuing
-echo "Waiting for Nginx PID file..."
-for i in {1..10}; do
-    if [ -s "/tmp/nginx/run/nginx.pid" ]; then
-        echo "Nginx PID detected: $(cat /tmp/nginx/run/nginx.pid)"
+# CRITICAL: Wait for Nginx to write its PID and ensure it is not empty
+echo "Verifying Nginx PID..."
+for i in {1..20}; do
+    if [ -s "/tmp/nginx/run/nginx.pid" ] && [ -n "$(cat /tmp/nginx/run/nginx.pid)" ]; then
+        echo "Nginx PID validated: $(cat /tmp/nginx/run/nginx.pid)"
         break
     fi
+    echo "Waiting for valid PID... ($i/20)"
     sleep 1
 done
 
-echo "Registry Setup Complete."
 tail -f /dev/null
