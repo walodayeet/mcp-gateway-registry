@@ -52,7 +52,7 @@ else:
 tls_options = {}
 if use_tls:
     tls_options['tls'] = True
-    tls_options['tlsCAFile'] = ca_file
+    if os.path.exists(ca_file): tls_options['tlsCAFile'] = ca_file
 while True:
     try:
         c = pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000, **tls_options)
