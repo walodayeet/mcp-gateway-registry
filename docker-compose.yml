@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:4.4.29
@@ -140,7 +138,7 @@ services:
 volumes:
   mongodb-data-v2:
   mongodb-config-v2:
-  keycloak_db_data-v2:
+  keycloak-db-data-v2:
   registry-servers-v2:
   registry-agents-v2:
   registry-models-v2:
