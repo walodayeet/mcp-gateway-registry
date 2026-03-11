@@ -288,65 +288,22 @@ def mask_headers(headers: dict) -> dict:
 
 
 async def map_groups_to_scopes(groups: list[str]) -> list[str]:    """Map identity provider groups to MCP scopes."""    scopes = []    try:        scope_repo = get_scope_repository()        for group in groups:            group_scopes = await scope_repo.get_group_mappings(group)            if group_scopes:                scopes.extend(group_scopes)    except Exception as e:        logger.error(f"Group mapping error: {e}", exc_info=True)        group_mappings = SCOPES_CONFIG.get('group_mappings', {})        for group in groups:            if group in group_mappings:                scopes.extend(group_mappings[group])    seen = set()    return [x for x in scopes if not (x in seen or seen.add(x))]async def validate_session_cookie(cookie_value: str) -> dict[str, any]:
-    """
-    Validate session cookie using itsdangerous serializer.
-
-    Args:
-        cookie_value: The session cookie value
-
-    Returns:
-        Dict containing validation results matching JWT validation format:
-        {
-            'valid': True,
-            'username': str,
-            'scopes': List[str],
-            'method': 'session_cookie',
-            'groups': List[str]
-        }
-
-    Raises:
-        ValueError: If cookie is invalid or expired
-    """
-    # Use global signer initialized at startup
-    global signer
-    if not signer:
-        logger.warning("Global signer not configured for session cookie validation")
-        raise ValueError("Session cookie validation not configured")
-
+    """Map identity provider groups to MCP scopes."""
+    scopes = []
     try:
-        # Decrypt cookie (max_age=28800 for 8 hours)
-        data = signer.loads(cookie_value, max_age=28800)
-
-        # Extract user info
-        username = data.get("username")
-        groups = data.get("groups", [])
-
-        # Map groups to scopes (async call to query DocumentDB)
-        scopes = await map_groups_to_scopes(groups)
-
-        logger.info(f"Session cookie validated for user: {hash_username(username)}")
-
-        return {
-            "valid": True,
-            "username": username,
-            "scopes": scopes,
-            "method": "session_cookie",
-            "groups": groups,
-            "client_id": "",  # Not applicable for session
-            "data": data,  # Include full data for consistency
-        }
-    except SignatureExpired:
-        logger.warning("Session cookie has expired")
-        raise ValueError("Session cookie has expired")
-    except BadSignature:
-        logger.warning("Invalid session cookie signature")
-        raise ValueError("Invalid session cookie")
+        scope_repo = get_scope_repository()
+        for group in groups:
+            group_scopes = await scope_repo.get_group_mappings(group)
+            if group_scopes:
+                scopes.extend(group_scopes)
     except Exception as e:
-        logger.error(f'RELOAD_SCOPES_FAILED: {e}', exc_info=True)
-        logger.error(f"Session cookie validation error: {e}")
-        raise ValueError(f"Session cookie validation failed: {e}")
-
-
+        logger.error(f"Group mapping error: {e}", exc_info=True)
+        group_mappings = SCOPES_CONFIG.get("group_mappings", {})
+        for group in groups:
+            if group in group_mappings:
+                scopes.extend(group_mappings[group])
+    seen = set()
+    return [x for x in scopes if not (x in seen or seen.add(x))]
 def parse_server_and_tool_from_url(original_url: str) -> tuple[str | None, str | None]:
     """
     Parse server name and tool name from the original URL and request payload.
