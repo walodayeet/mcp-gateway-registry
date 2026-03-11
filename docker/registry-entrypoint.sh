@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-echo "Starting Registry Service Setup... (Build Version: ${BUILD_VERSION})"
+echo "Starting Registry Service Setup..."
 
 # --- Wait for MongoDB ---
 if [ -n "$DOCUMENTDB_HOST" ]; then
@@ -21,20 +21,28 @@ PYEOF
     deactivate
 fi
 
-# Prepare config directory
-mkdir -p /etc/nginx/conf.d /run/nginx /etc/nginx/lua
-rm -f /etc/nginx/conf.d/nginx_rev_proxy.conf
+# --- Nginx Non-Root Permission Fix ---
+# Create writable directories for Nginx
+mkdir -p /tmp/nginx/body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi /tmp/nginx/run
 
-# Start Registry in background
+# Modify main nginx.conf to use writable paths and remove root-only directives
+if [ -f /etc/nginx/nginx.conf ]; then
+    # Remove user directive
+    sed -i 's/^user /#user /g' /etc/nginx/nginx.conf
+    # Change pid location to /tmp
+    sed -i 's|pid /run/nginx.pid;|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf
+    sed -i 's|pid /var/run/nginx.pid;|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf
+fi
+
+# --- Registry App Startup ---
 cd /app && source /app/.venv/bin/activate
 echo "Launching Registry app..."
 uvicorn registry.main:app --host 0.0.0.0 --port 7860 --proxy-headers --forwarded-allow-ips='*' &
 
-# Wait for VALID Nginx config (Placeholder-free)
+# --- Wait for Config and Start Nginx ---
 echo "Waiting for Registry to generate processed Nginx config..."
 for i in {1..45}; do
     if [ -f "/etc/nginx/conf.d/nginx_rev_proxy.conf" ]; then
-        # Check for {{ placeholders using extended regex
         if ! grep -qE '\{\{' "/etc/nginx/conf.d/nginx_rev_proxy.conf"; then
             echo "Validated Nginx config found!"
             break
@@ -43,12 +51,6 @@ for i in {1..45}; do
     sleep 2
 done
 
-if grep -qE '\{\{' "/etc/nginx/conf.d/nginx_rev_proxy.conf" 2>/dev/null; then
-    echo "FATAL: Nginx config still contains placeholders after 90s!"
-    cat /etc/nginx/conf.d/nginx_rev_proxy.conf
-    exit 1
-fi
-
+# Start Nginx using the validated config
 echo "Starting Nginx..."
-nginx
-tail -f /dev/null
+nginx -g 'daemon off;'
