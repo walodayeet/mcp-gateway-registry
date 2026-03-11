@@ -21,6 +21,15 @@ services:
     ports:
       - "27017:27017"
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       - mongodb-data:/data/db
       - mongodb-config:/data/configdb
     healthcheck:
@@ -47,6 +56,15 @@ services:
       - DOCUMENTDB_NAMESPACE=${DOCUMENTDB_NAMESPACE:-default}
       - ENTRA_GROUP_ADMIN_ID=${ENTRA_GROUP_ADMIN_ID:-}
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       - ./scripts/init-mongodb-ce.py:/app/scripts/init-mongodb-ce.py:ro
       - ./scripts/registry-admins.json:/app/scripts/registry-admins.json:ro
       - ./scripts/mcp-registry-admin.json:/app/scripts/mcp-registry-admin.json:ro
@@ -164,14 +182,23 @@ services:
     cap_drop:
       - ALL
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       # User-managed content (bind mounts)
-      - ${HOME}/mcp-gateway/servers:/app/registry/servers
-      - ${HOME}/mcp-gateway/agents:/app/registry/agents
-      - ${HOME}/mcp-gateway/models:/app/registry/models
-      - ${HOME}/mcp-gateway/auth_server/scopes.yml:/app/auth_server/scopes.yml
-      - ${HOME}/mcp-gateway/federation.json:/app/config/federation.json
-      - ${HOME}/mcp-gateway/ssl:/etc/ssl:ro
-      - ${HOME}/.aws:/root/.aws:ro
+      - mcp-servers:/app/registry/servers
+      - mcp-agents:/app/registry/agents
+      - mcp-models:/app/registry/models
+      - mcp-auth-scopes:/app/auth_server/scopes.yml
+      - mcp-federation-config:/app/config/federation.json
+      - mcp-ssl:/etc/ssl:ro
+      - aws-config:/root/.aws:ro
       # Application-managed (named volumes with proper permissions)
       - registry-logs:/app/logs
       - registry-scans:/app/security_scans
@@ -209,6 +236,15 @@ services:
     cap_drop:
       - ALL
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       - metrics-db-data:/var/lib/sqlite
       # Application-managed (named volume with proper permissions)
       - metrics-logs:/app/logs
@@ -288,9 +324,18 @@ services:
     cap_drop:
       - ALL
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       # Application-managed (named volume with proper permissions)
       - auth-logs:/app/logs
-      # - ${HOME}/mcp-gateway/auth_server/scopes.yml:/app/scopes.yml
+      # - mcp-auth-scopes:/app/scopes.yml
     depends_on:
       metrics-service:
         condition: service_healthy
@@ -324,7 +369,16 @@ services:
       - PORT=8001
       - SECRET_KEY=${SECRET_KEY}
     volumes:
-      - ${HOME}/mcp-gateway/secrets/fininfo/:/app/fininfo/
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
+      - mcp-fininfo-secrets:/app/fininfo/
     ports:
       - "8001:8001"
     restart: unless-stopped
@@ -341,9 +395,18 @@ services:
       - PORT=8003
       - REGISTRY_BASE_URL=http://registry:8080
     volumes:
-      - ${HOME}/mcp-gateway/servers:/app/registry/servers
-      - ${HOME}/mcp-gateway/models:/app/registry/models
-      - ${HOME}/mcp-gateway/auth_server/scopes.yml:/app/auth_server/scopes.yml
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
+      - mcp-servers:/app/registry/servers
+      - mcp-models:/app/registry/models
+      - mcp-auth-scopes:/app/auth_server/scopes.yml
     ports:
       - "8003:8003"
     depends_on:
@@ -373,6 +436,15 @@ services:
     cap_drop:
       - ALL
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       - metrics-db-data:/var/lib/sqlite
     restart: unless-stopped
     healthcheck:
@@ -387,6 +459,15 @@ services:
     ports:
       - "9090:9090"
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     command:
@@ -408,6 +489,15 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_AUTH_ANONYMOUS_ENABLED=false
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       - grafana-data:/var/lib/grafana
       - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
@@ -423,6 +513,15 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       - keycloak_db_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
@@ -472,6 +571,15 @@ services:
       keycloak-db:
         condition: service_healthy
     volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
       - ./keycloak/themes:/opt/keycloak/themes
       - ./keycloak/providers:/opt/keycloak/providers
       - ./keycloak/import:/opt/keycloak/data/import
@@ -484,6 +592,15 @@ services:
       start_period: 60s
 
 volumes:
+  mcp-servers:
+  mcp-agents:
+  mcp-models:
+  mcp-auth-scopes:
+  mcp-federation-config:
+  mcp-ssl:
+  aws-config:
+  mcp-fininfo-secrets:
+
   ssl_data:
   keycloak_db_data:
   metrics-db-data:
