@@ -6,8 +6,8 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongodb-data-v2:/data/db
-      - mongodb-config-v2:/data/configdb
+      - mongodb-data-v3:/data/db
+      - mongodb-config-v3:/data/configdb
     healthcheck:
       test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
       interval: 60s
@@ -58,19 +58,15 @@ services:
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_REALM=mcp-gateway
       - KEYCLOAK_CLIENT_ID=mcp-gateway-web
-      - COGNITO_ENABLED=false
-      - GITHUB_ENABLED=false
-      - ENTRA_ENABLED=false
-      - GOOGLE_ENABLED=false
     ports:
       - "8087:8080"
       - "8443:8443"
       - "7860:7860"
     volumes:
-      - registry-servers-v2:/app/registry/servers
-      - registry-agents-v2:/app/registry/agents
-      - registry-models-v2:/app/registry/models
-      - registry-logs-v2:/app/logs
+      - registry-servers-v3:/app/registry/servers
+      - registry-agents-v3:/app/registry/agents
+      - registry-models-v3:/app/registry/models
+      - registry-logs-v3:/app/logs
     depends_on:
       auth-server:
         condition: service_started
@@ -93,8 +89,6 @@ services:
       - KEYCLOAK_CLIENT_ID=mcp-gateway-web
       - COGNITO_ENABLED=false
       - GITHUB_ENABLED=false
-      - ENTRA_ENABLED=false
-      - GOOGLE_ENABLED=false
       - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
@@ -102,7 +96,7 @@ services:
     ports:
       - "8888:8888"
     volumes:
-      - auth-logs-v2:/app/logs
+      - auth-logs-v3:/app/logs
     depends_on:
       mongodb-init:
         condition: service_completed_successfully
@@ -131,7 +125,7 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
     volumes:
-      - keycloak-db-data-v2:/var/lib/postgresql/data
+      - keycloak-db-data-v3:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak"]
@@ -161,11 +155,11 @@ services:
     restart: unless-stopped
 
 volumes:
-  mongodb-data-v2:
-  mongodb-config-v2:
-  keycloak-db-data-v2:
-  registry-servers-v2:
-  registry-agents-v2:
-  registry-models-v2:
-  registry-logs-v2:
-  auth-logs-v2:
+  mongodb-data-v3:
+  mongodb-config-v3:
+  keycloak-db-data-v3:
+  registry-servers-v3:
+  registry-agents-v3:
+  registry-models-v3:
+  registry-logs-v3:
+  auth-logs-v3:
