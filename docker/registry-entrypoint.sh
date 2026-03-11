@@ -34,48 +34,36 @@ fi
 if [ -n "$DOCUMENTDB_HOST" ]; then
     echo "Waiting for MongoDB replica set at ${DOCUMENTDB_HOST}:${DOCUMENTDB_PORT:-27017}..."
     source /app/.venv/bin/activate
-    python3 -c "
-import pymongo, os, time, sys
+    python3 -c "import pymongo, os, time, sys
 host = os.getenv('DOCUMENTDB_HOST', 'mongodb')
 port = int(os.getenv('DOCUMENTDB_PORT', '27017'))
 user = os.getenv('DOCUMENTDB_USERNAME', '')
 pwd = os.getenv('DOCUMENTDB_PASSWORD', '')
 backend = os.getenv('STORAGE_BACKEND', 'mongodb-ce')
 use_tls = os.getenv('DOCUMENTDB_USE_TLS', 'false').lower() == 'true'
-if backend == 'mongodb-ce': use_tls = False
 ca_file = os.getenv('DOCUMENTDB_TLS_CA_FILE', '/app/certs/global-bundle.pem')
+# Force disable TLS for mongodb-ce or if cert is missing
+if backend == 'mongodb-ce': use_tls = False
+if use_tls and not os.path.exists(ca_file): use_tls = False
 auth = 'SCRAM-SHA-256' if backend == 'mongodb-ce' else 'SCRAM-SHA-1'
 if user and pwd:
     uri = f'mongodb://{user}:{pwd}@{host}:{port}/?authMechanism={auth}&authSource=admin'
 else:
     uri = f'mongodb://{host}:{port}/'
-# Prepare TLS options
 tls_options = {}
 if use_tls:
     tls_options['tls'] = True
-    if use_tls and os.path.exists(ca_file): tls_options['tlsCAFile'] = ca_file
+    tls_options['tlsCAFile'] = ca_file
 while True:
     try:
         c = pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000, **tls_options)
         c.admin.command('ping')
-        try:
-            st = c.admin.command('replSetGetStatus')
-            ready = [m for m in st['members'] if m['state'] in [1, 2]]
-            total = len(st['members'])
-            if st['ok'] == 1 and len(ready) == total:
-                print(f'MongoDB replica set ready ({len(ready)}/{total} members)')
-                c.close()
-                break
-            print(f'Waiting for replica set: {len(ready)}/{total} ready')
-        except pymongo.errors.OperationFailure:
-            # Standalone mode (no replica set) - ping succeeded so we're good
-            print('MongoDB is ready (standalone mode)')
-            c.close()
-            break
+        print('MongoDB is ready')
+        c.close()
+        break
     except Exception as e:
         print(f'MongoDB not ready yet: {e}')
-    time.sleep(5)
-"
+    time.sleep(5)"
     deactivate
     echo "MongoDB is ready."
 fi
@@ -258,79 +246,3 @@ export EMBEDDINGS_MODEL_DIMENSIONS=$EMBEDDINGS_MODEL_DIMENSIONS
 
 echo "Starting MCP Registry in the background..."
 cd /app
-source /app/.venv/bin/activate
-uvicorn registry.main:app --host 0.0.0.0 --port 7860 --proxy-headers --forwarded-allow-ips='*' &
-echo "MCP Registry started."
-
-# Wait for nginx config to be generated (check that placeholders are replaced)
-echo "Waiting for nginx configuration to be generated..."
-WAIT_TIME=0
-MAX_WAIT=120
-while [ $WAIT_TIME -lt $MAX_WAIT ]; do
-    if [ -f "/etc/nginx/conf.d/nginx_rev_proxy.conf" ]; then
-        # Check if placeholders have been replaced
-        if ! grep -q "{{ADDITIONAL_SERVER_NAMES}}" "/etc/nginx/conf.d/nginx_rev_proxy.conf" && \
-           ! grep -q "{{ANTHROPIC_API_VERSION}}" "/etc/nginx/conf.d/nginx_rev_proxy.conf" && \
-           ! grep -q "{{LOCATION_BLOCKS}}" "/etc/nginx/conf.d/nginx_rev_proxy.conf" && \
-           ! grep -q "{{VIRTUAL_SERVER_BLOCKS}}" "/etc/nginx/conf.d/nginx_rev_proxy.conf"; then
-            echo "Nginx configuration generated successfully"
-            break
-        fi
-    fi
-    sleep 2
-    WAIT_TIME=$((WAIT_TIME + 2))
-done
-
-if [ $WAIT_TIME -ge $MAX_WAIT ]; then
-    echo "WARNING: Timeout waiting for nginx configuration. Starting nginx anyway..."
-fi
-
-# Resolve METRICS_SERVICE_URL hostname to IPv4 before nginx starts.
-# Lua cosockets use the nginx resolver (VPC DNS 169.254.169.253), which cannot
-# resolve Service Connect names (only the Envoy sidecar can).  By substituting
-# the hostname with its IPv4 Service Connect VIP (127.255.0.x) in the env var,
-# flush_metrics.lua connects directly to the IP, bypassing DNS entirely.
-if [ -n "$METRICS_SERVICE_URL" ]; then
-    metrics_host=$(echo "$METRICS_SERVICE_URL" | sed 's|http://||;s|:.*||')
-    if ! echo "$metrics_host" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-        resolved=$(getent ahostsv4 "$metrics_host" 2>/dev/null | head -1 | awk '{print $1}')
-        if [ -n "$resolved" ]; then
-            export METRICS_SERVICE_URL=$(echo "$METRICS_SERVICE_URL" | sed "s|$metrics_host|$resolved|")
-            echo "Resolved METRICS_SERVICE_URL: $metrics_host -> $resolved ($METRICS_SERVICE_URL)"
-        else
-            echo "WARNING: Could not resolve $metrics_host to IPv4 -- metrics flush may fail"
-        fi
-    fi
-fi
-
-# Add FQDN aliases for Service Connect entries in /etc/hosts.
-# Service Connect only registers short names (e.g., "auth-server"), but servers
-# may be registered with Cloud Map FQDNs (e.g., "auth-server.mcp-gateway.local").
-# The Python health checker resolves proxy_pass_url hostnames via system DNS,
-# which only finds /etc/hosts entries.  Adding FQDN aliases ensures both short
-# names and FQDNs resolve to the IPv4 Service Connect VIP.
-# Gated on SERVICE_CONNECT_NAMESPACE -- only set in ECS Terraform deployments.
-if [ -n "${SERVICE_CONNECT_NAMESPACE:-}" ]; then
-    if [ -w /etc/hosts ]; then
-        fqdn_count=0
-        grep '^127\.255\.0\.' /etc/hosts | while read -r ip name _rest; do
-            echo "$ip ${name}.${SERVICE_CONNECT_NAMESPACE}" >> /etc/hosts
-            fqdn_count=$((fqdn_count + 1))
-        done
-        echo "Added FQDN aliases for Service Connect entries (namespace: ${SERVICE_CONNECT_NAMESPACE})"
-    else
-        echo "INFO: /etc/hosts not writable (ECS Fargate), FQDN aliases skipped"
-        echo "      Short names and IPs will still work via Service Connect"
-    fi
-fi
-
-echo "Starting Nginx..."
-# Create /run/nginx directory for pid file (tmpfs mount overwrites Dockerfile creation)
-mkdir -p /run/nginx
-# Change pid file location to writable directory for non-root user
-sed -i 's|pid /run/nginx.pid;|pid /run/nginx/nginx.pid;|' /etc/nginx/nginx.conf
-nginx
-
-echo "Registry service fully started. Keeping container alive..."
-# Keep the container running indefinitely
-tail -f /dev/null 
