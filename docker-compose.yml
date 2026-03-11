@@ -54,9 +54,9 @@ services:
       - DOCUMENTDB_USE_TLS=false
       - AUTH_PROVIDER=${AUTH_PROVIDER:-keycloak}
       - KEYCLOAK_ENABLED=true
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-mcp-gateway}
-      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-mcp-gateway-web}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=mcp-gateway
+      - KEYCLOAK_CLIENT_ID=mcp-gateway-web
     ports:
       - "8087:8080"
       - "8443:8443"
@@ -82,10 +82,10 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - AUTH_PROVIDER=${AUTH_PROVIDER:-keycloak}
       - KEYCLOAK_ENABLED=true
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
+      - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL:-http://localhost:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-mcp-gateway}
-      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-mcp-gateway-web}
+      - KEYCLOAK_REALM=mcp-gateway
+      - KEYCLOAK_CLIENT_ID=mcp-gateway-web
       - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
@@ -97,6 +97,22 @@ services:
     depends_on:
       mongodb-init:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  mcpgw-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mcp-server
+      args:
+        SERVER_DIR: servers/mcpgw
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8003
+      - REGISTRY_BASE_URL=http://registry:8080
+    ports:
+      - "8003:8003"
+    depends_on:
+      - registry
     restart: unless-stopped
 
   keycloak-db:
