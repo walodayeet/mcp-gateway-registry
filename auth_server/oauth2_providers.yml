@@ -15,7 +15,7 @@ providers:
     groups_claim: "groups"
     email_claim: "email"
     name_claim: "name"
-    enabled: "${KEYCLOAK_ENABLED}"
+    enabled: true
 
   cognito:
     display_name: "AWS Cognito"
@@ -34,7 +34,7 @@ providers:
     groups_claim: "cognito:groups"
     email_claim: "email"
     name_claim: "name"
-    enabled: "${COGNITO_ENABLED}"
+    enabled: false
 
   entra:
     display_name: "Microsoft Entra ID"
@@ -55,7 +55,7 @@ providers:
     groups_claim: "groups"
     email_claim: "email"
     name_claim: "name"
-    enabled: "${ENTRA_ENABLED}"
+    enabled: false
 
   github:
     display_name: "GitHub"
@@ -72,7 +72,7 @@ providers:
     groups_claim: null  # GitHub doesn't provide groups in basic scope
     email_claim: "email"
     name_claim: "name"
-    enabled: "${GITHUB_ENABLED}"
+    enabled: false
 
   google:
     display_name: "Google"
@@ -89,7 +89,7 @@ providers:
     groups_claim: null  # Google doesn't provide groups in basic scope
     email_claim: "email"
     name_claim: "name"
-    enabled: "${GOOGLE_ENABLED}"
+    enabled: false
 
 # Default session settings
 session:

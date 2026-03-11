@@ -25,16 +25,13 @@ services:
     environment:
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
-      - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
+      - DOCUMENTDB_DATABASE=mcp_registry
       - DOCUMENTDB_USE_TLS=false
     volumes:
       - ./scripts/init-mongodb-ce.py:/app/scripts/init-mongodb-ce.py:ro
       - ./scripts/registry-admins.json:/app/scripts/registry-admins.json:ro
     command: >
-      sh -c "
-      pip install --quiet motor pymongo &&
-      python /app/scripts/init-mongodb-ce.py
-      "
+      sh -c "pip install --quiet motor pymongo && python /app/scripts/init-mongodb-ce.py"
     restart: "no"
 
   registry:
@@ -87,12 +84,11 @@ services:
       - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL:-http://localhost:8080}
       - KEYCLOAK_REALM=mcp-gateway
       - KEYCLOAK_CLIENT_ID=mcp-gateway-web
-      - COGNITO_ENABLED=false
-      - GITHUB_ENABLED=false
       - STORAGE_BACKEND=mongodb-ce
       - DOCUMENTDB_HOST=mongodb
       - DOCUMENTDB_PORT=27017
       - DOCUMENTDB_USE_TLS=false
+      - AUTH_SERVER_HOST=0.0.0.0
     ports:
       - "8888:8888"
     volumes:
