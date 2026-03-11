@@ -54,7 +54,7 @@ services:
       - DOCUMENTDB_REPLICA_SET=rs0
     ports:
       - "8087:8080"
-      - "443:8443"
+      - "8443:8443"
       - "7860:7860"
     volumes:
       - registry-servers-v2:/app/registry/servers
