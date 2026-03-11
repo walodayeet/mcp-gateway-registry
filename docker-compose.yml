@@ -61,7 +61,7 @@ services:
       - mcp-servers:/app/registry/servers
       - mcp-agents:/app/registry/agents
       - mcp-models:/app/registry/models
-      # Removed scopes.yml and federation.json mounts to avoid directory/file conflicts in Dokploy
+      # Removed scopes.yml and federation.json mounts to avoid directory/file conflicts
       - registry-logs:/app/logs
     depends_on:
       auth-server:
