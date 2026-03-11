@@ -121,7 +121,7 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
     volumes:
-      - keycloak_db_data-v3:/var/lib/postgresql/data
+      - keycloak-db-data-v3:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak"]
@@ -153,7 +153,7 @@ services:
 volumes:
   mongodb-data-v3:
   mongodb-config-v3:
-  keycloak_db_data-v3:
+  keycloak-db-data-v3:
   registry-servers-v3:
   registry-agents-v3:
   registry-models-v3:
