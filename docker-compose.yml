@@ -29,6 +29,7 @@ services:
       - DOCUMENTDB_PORT=27017
       - DOCUMENTDB_DATABASE=${DOCUMENTDB_DATABASE:-mcp_registry}
     volumes:
+      # Using relative bind mounts for init scripts (Dokploy handles these fine usually)
       - ./scripts/init-mongodb-ce.py:/app/scripts/init-mongodb-ce.py:ro
       - ./scripts/registry-admins.json:/app/scripts/registry-admins.json:ro
       - ./scripts/mcp-registry-admin.json:/app/scripts/mcp-registry-admin.json:ro
@@ -61,7 +62,7 @@ services:
       - mcp-servers:/app/registry/servers
       - mcp-agents:/app/registry/agents
       - mcp-models:/app/registry/models
-      # Removed scopes.yml and federation.json mounts to avoid directory/file conflicts
+      # IMPORTANT: Removed all single-file volume mounts (scopes.yml, federation.json)
       - registry-logs:/app/logs
     depends_on:
       auth-server:
