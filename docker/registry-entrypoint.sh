@@ -7,13 +7,13 @@ if [[ "${DOCUMENTDB_HOST}" == *"docdb-elastic.amazonaws.com"* ]]; then
     CA_BUNDLE_URL="https://www.amazontrust.com/repository/SFSRootCAG2.pem"
     CA_BUNDLE_PATH="/app/certs/global-bundle.pem"
     if [ ! -f "$CA_BUNDLE_PATH" ]; then
-        curl -fsSL "$CA_BUNDLE_URL" -o "$CA_BUNDLE_PATH"
+        curl -fsSL "$CA_BUNDLE_URL" -o "$CA_BUNDLE_PATH" || echo "Warning: Failed to download CA bundle"
     fi
 elif [[ "${DOCUMENTDB_HOST}" == *"docdb.amazonaws.com"* ]]; then
     CA_BUNDLE_URL="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
     CA_BUNDLE_PATH="/app/certs/global-bundle.pem"
     if [ ! -f "$CA_BUNDLE_PATH" ]; then
-        curl -fsSL "$CA_BUNDLE_URL" -o "$CA_BUNDLE_PATH"
+        curl -fsSL "$CA_BUNDLE_URL" -o "$CA_BUNDLE_PATH" || echo "Warning: Failed to download CA bundle"
     fi
 fi
 
@@ -43,7 +43,6 @@ else:
     uri = f'mongodb://{host}:{port}/'
 tls_options = {'tls': use_tls}
 if use_tls: tls_options['tlsCAFile'] = ca_file
-print(f'Connecting to MongoDB (TLS: {use_tls})')
 while True:
     try:
         c = pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000, **tls_options)
@@ -61,18 +60,31 @@ SECRET_KEY="${SECRET_KEY:-$(python3 -c 'import secrets; print(secrets.token_hex(
 echo "SECRET_KEY=${SECRET_KEY}" > /app/registry/.env
 
 # Nginx Setup
-mkdir -p /etc/nginx/lua /run/nginx
-cp /app/docker/lua/*.lua /etc/nginx/lua/
+mkdir -p /etc/nginx/lua /run/nginx /etc/nginx/conf.d
+cp /app/docker/lua/*.lua /etc/nginx/lua/ 2>/dev/null || true
 rm -f /etc/nginx/sites-enabled/default
-if [ ! -f "/etc/ssl/certs/fullchain.pem" ]; then
-    cp /app/docker/nginx_rev_proxy_http_only.conf /etc/nginx/conf.d/nginx_rev_proxy.conf
-else
-    cp /app/docker/nginx_rev_proxy_http_and_https.conf /etc/nginx/conf.d/nginx_rev_proxy.conf
-fi
-sed -i 's|pid /run/nginx.pid;|pid /run/nginx/nginx.pid;|' /etc/nginx/nginx.conf
+sed -i 's|pid /run/nginx.pid;|pid /run/nginx/nginx.pid;|' /etc/nginx/nginx.conf || true
 
-# Run Registry
+# Run Registry - it will generate the processed nginx config
 cd /app && source /app/.venv/bin/activate
 uvicorn registry.main:app --host 0.0.0.0 --port 7860 --proxy-headers --forwarded-allow-ips='*' &
+
+# Wait for the Registry app to generate the Nginx config (without placeholders)
+echo "Waiting for Registry to generate processed Nginx configuration..."
+MAX_WAIT=60
+TIMER=0
+while [ $TIMER -lt $MAX_WAIT ]; do
+    if [ -f "/etc/nginx/conf.d/nginx_rev_proxy.conf" ]; then
+        if ! grep -q "{{" "/etc/nginx/conf.d/nginx_rev_proxy.conf"; then
+            echo "Nginx configuration ready."
+            break
+        fi
+    fi
+    sleep 2
+    TIMER=$((TIMER + 2))
+done
+
+echo "Starting Nginx..."
 nginx
+echo "Registry fully operational."
 tail -f /dev/null

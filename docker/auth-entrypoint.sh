@@ -36,4 +36,5 @@ PYEOF
 fi
 
 cd /app && source /app/.venv/bin/activate
-python3 auth_server/server.py
+# server.py is in /app root according to Dockerfile.auth
+python3 server.py
