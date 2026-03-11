@@ -4,7 +4,7 @@ echo "Starting Registry Service Setup..."
 
 # --- Wait for MongoDB ---
 if [ -n "$DOCUMENTDB_HOST" ]; then
-    echo "Waiting for MongoDB..."
+    echo "Waiting for MongoDB at ${DOCUMENTDB_HOST}:${DOCUMENTDB_PORT:-27017}..."
     source /app/.venv/bin/activate
     python3 <<'PYEOF'
 import pymongo, os, time
@@ -28,37 +28,30 @@ PYEOF
     deactivate
 fi
 
-# Prep Nginx
+# Setup directories
 mkdir -p /etc/nginx/lua /run/nginx /etc/nginx/conf.d
 cp /app/docker/lua/*.lua /etc/nginx/lua/ 2>/dev/null || true
 rm -f /etc/nginx/sites-enabled/default
 sed -i 's|pid /run/nginx.pid;|pid /run/nginx/nginx.pid;|' /etc/nginx/nginx.conf 2>/dev/null || true
 
-# Start Registry App
+# Start Registry in background - it generates the Nginx config
 cd /app && source /app/.venv/bin/activate
-echo "Starting Registry app..."
 uvicorn registry.main:app --host 0.0.0.0 --port 7860 --proxy-headers --forwarded-allow-ips='*' &
 
-# Wait for processed Nginx config
-echo "Waiting for processed Nginx configuration..."
-for i in {1..30}; do
+# Wait for processed Nginx config (no placeholders)
+echo "Waiting for Registry to generate Nginx config..."
+TIMER=0
+while [ $TIMER -lt 60 ]; do
     if [ -f "/etc/nginx/conf.d/nginx_rev_proxy.conf" ]; then
         if ! grep -q "{{" "/etc/nginx/conf.d/nginx_rev_proxy.conf"; then
-            echo "Nginx config is ready and valid."
+            echo "Nginx config is ready."
             break
         fi
     fi
-    echo "Waiting for config generation... ($i/30)"
     sleep 2
+    TIMER=$((TIMER + 2))
 done
 
-# Final check before starting Nginx
-if grep -q "{{" "/etc/nginx/conf.d/nginx_rev_proxy.conf" 2>/dev/null; then
-    echo "ERROR: Nginx config still contains placeholders. Skipping Nginx start to avoid crash."
-else
-    echo "Starting Nginx..."
-    nginx
-fi
-
-echo "Setup complete. Keeping container alive."
+nginx
+echo "Registry and Nginx started."
 tail -f /dev/null
